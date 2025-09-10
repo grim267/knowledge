@@ -5,7 +5,7 @@ import { authService } from '../services/authService';
 import { MFASetup } from './MFASetup';
 
 interface UserManagementProps {
-  currentUser: User;
+  currentUser?: User;
 }
 
 export function UserManagement({ currentUser }: UserManagementProps) {
@@ -131,6 +131,19 @@ export function UserManagement({ currentUser }: UserManagementProps) {
   };
 
   const canManageUsers = authService.canManageUsers(currentUser);
+
+  // Safety check for currentUser
+  if (!currentUser) {
+    return (
+      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+        <div className="text-center py-8">
+          <Shield className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-white mb-2">Authentication Required</h3>
+          <p className="text-gray-400">Please log in to access user management.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!canManageUsers) {
     return (
@@ -309,13 +322,11 @@ export function UserManagement({ currentUser }: UserManagementProps) {
                   <label className="block text-sm font-medium text-gray-300 mb-2">Department</label>
                   <input
                     type="text"
-                    value="Security Operations"
+                    value={createUserData.department || "Security Operations"}
                     onChange={(e) => setCreateUserData(prev => ({ ...prev, department: e.target.value }))}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
                     placeholder="Security Operations"
-                    readOnly
                   />
-                  <p className="text-xs text-gray-500 mt-1">Department is set to 'Security Operations'</p>
                 </div>
               </div>
             </div>
@@ -366,7 +377,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
                     lastName: '',
                     password: '',
                     roleId: '',
-                    department: ''
+                    department: 'Security Operations'
                   });
                   setError('');
                 }}

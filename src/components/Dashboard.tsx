@@ -212,7 +212,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       case 'incidents':
         return <IncidentList incidents={safeIncidents} />;
       case 'user-management':
-        return <UserManagement />;
+        return <UserManagement currentUser={user} />;
       case 'critical-incidents':
         return <CriticalIncidentsPanel criticalIncidents={safeCriticalIncidents} />;
       case 'detection':
