@@ -7,11 +7,10 @@ import { NetworkMonitor } from './NetworkMonitor';
 import { SystemStatus } from './SystemStatus';
 import { AlertPanel } from './AlertPanel';
 import { ThreatDetectionPanel } from './ThreatDetectionPanel';
-import { SystemAlertPanel } from './SystemAlertPanel';
 import { UserManagement } from './UserManagement';
-import { CriticalIncidentsPanel } from './CriticalIncidentsPanel';
 import { MLModelTraining } from './MLModelTraining';
 import { EmailAlertConfiguration } from './EmailAlertConfiguration';
+import { RealTimeInterfaceMonitor } from './RealTimeInterfaceMonitor';
 import { useIncidentData } from '../hooks/useIncidentData';
 import { User } from '../types/user';
 
@@ -34,8 +33,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     backendConnected,
     backendStats,
     threatBackendConnected,
-    criticalIncidents,
-    criticalIncidentsConnected
   } = useIncidentData();
   
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
@@ -49,8 +46,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const safeAnomalies = anomalies || [];
   const safeNetworkTraffic = networkTraffic || [];
 
-  const safeCriticalIncidents = criticalIncidents || [];
-  const criticalIncidentsCount = safeCriticalIncidents.length;
   const localCriticalIncidents = safeIncidents.filter(i => i.severity === 'critical').length;
   const highIncidents = safeIncidents.filter(i => i.severity === 'high').length;
   const activeLocalIncidents = safeIncidents.filter(i => i.status !== 'resolved').length;
@@ -60,7 +55,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const criticalAnomalies = safeAnomalies.filter(a => a.severity === 'critical').length;
 
   // Calculate total active threats from all sources
-  const totalActiveThreats = activeLocalIncidents + highConfidenceThreats + criticalIncidentsCount + (backendStats?.active_threats || 0);
+  const totalActiveThreats = activeLocalIncidents + highConfidenceThreats + localCriticalIncidents + (backendStats?.active_threats || 0);
 
   const stats = [
     {
@@ -72,7 +67,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     },
     {
       title: 'Critical Incidents',
-      value: criticalIncidentsCount + localCriticalIncidents + criticalAnomalies,
+      value: localCriticalIncidents + criticalAnomalies,
       icon: AlertTriangle,
       color: 'text-orange-400',
       bgColor: 'bg-orange-500/20'
@@ -99,15 +94,13 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     systemsOnline: `${onlineSystemsCount}/${safeSystemStatus.length}`,
     activeAlerts: safeAlerts.filter(a => !a.acknowledged && !a.isDuplicate).length,
     recentIncidents: safeIncidents.length,
-    criticalIncidents: criticalIncidentsCount + localCriticalIncidents
+    criticalIncidents: localCriticalIncidents
   };
 
   const getSectionTitle = () => {
     switch (activeSection) {
       case 'threats':
         return 'Active Threats';
-      case 'critical':
-        return 'Critical Incidents';
       case 'network':
         return 'Network Traffic Monitor';
       case 'systems':
@@ -120,8 +113,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         return 'Threat Detection & Anomalies';
       case 'user-management':
         return 'User Management';
-      case 'critical-incidents':
-        return 'Critical Incidents';
       case 'email-alerts':
         return 'Email Alert Configuration';
       case 'interface-monitor':
@@ -185,29 +176,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
             <IncidentList incidents={safeIncidents.filter(i => i && i.status && i.status !== 'resolved')} />
           </div>
         );
-      case 'critical':
-        return (
-          <div className="space-y-6">
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Critical Incidents Overview</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-red-900/30 rounded-lg p-4">
-                  <div className="text-red-400 text-2xl font-bold">{criticalIncidentsCount + localCriticalIncidents}</div>
-                  <div className="text-gray-400 text-sm">Critical Incidents</div>
-                </div>
-                <div className="bg-orange-900/30 rounded-lg p-4">
-                  <div className="text-orange-400 text-2xl font-bold">{highIncidents}</div>
-                  <div className="text-gray-400 text-sm">High Priority</div>
-                </div>
-                <div className="bg-yellow-900/30 rounded-lg p-4">
-                  <div className="text-yellow-400 text-2xl font-bold">{unacknowledgedAlerts}</div>
-                  <div className="text-gray-400 text-sm">Unacknowledged</div>
-                </div>
-              </div>
-            </div>
-            <CriticalIncidentsPanel criticalIncidents={safeCriticalIncidents} />
-          </div>
-        );
       case 'network':
         return <NetworkMonitor networkTraffic={safeNetworkTraffic} />;
       case 'systems':
@@ -218,8 +186,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         return <IncidentList incidents={safeIncidents} />;
       case 'user-management':
         return <UserManagement currentUser={user} />;
-      case 'critical-incidents':
-        return <CriticalIncidentsPanel criticalIncidents={safeCriticalIncidents} />;
       case 'detection':
         return <ThreatDetectionPanel threatDetections={safeThreatDetections} anomalies={safeAnomalies} />;
       case 'ml-training':
@@ -232,16 +198,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
           import('./RealTimeInterfaceMonitor').then(module => ({ default: module.RealTimeInterfaceMonitor }))
         );
         
-        return (
-          <React.Suspense fallback={
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
-              <span className="ml-2 text-gray-400">Loading interface monitor...</span>
-            </div>
-          }>
-            <RealTimeInterfaceMonitor />
-          </React.Suspense>
-        );
+        return <RealTimeInterfaceMonitor />;
       }
       default:
         return (
@@ -366,10 +323,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 <div className={`w-2 h-2 rounded-full ml-2 ${threatBackendConnected ? 'bg-green-400' : 'bg-gray-400'}`} />
                 <span className="text-xs text-gray-400">
                   Threats {threatBackendConnected ? 'Connected' : 'Disconnected'}
-                </span>
-                <div className={`w-2 h-2 rounded-full ml-2 ${criticalIncidentsConnected ? 'bg-red-400' : 'bg-gray-400'}`} />
-                <span className="text-xs text-gray-400">
-                  Critical {criticalIncidentsConnected ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
               <button

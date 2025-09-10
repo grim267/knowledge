@@ -53,13 +53,6 @@ export function Sidebar({
       color: 'text-red-400'
     },
     {
-      id: 'critical',
-      label: 'Critical Incidents',
-      icon: AlertTriangle,
-      count: stats.criticalIncidents,
-      color: 'text-orange-400'
-    },
-    {
       id: 'network',
       label: 'Network Monitor',
       icon: Activity,
@@ -88,7 +81,7 @@ export function Sidebar({
       color: 'text-purple-400'
     },
     {
-      id: 'email-alerts',
+      id: 'email-alerts', 
       label: 'Email Alerts',
       icon: Mail,
       count: null,
@@ -102,7 +95,7 @@ export function Sidebar({
       color: 'text-purple-500'
     },
     {
-      id: 'interface-monitor',
+      id: 'interface-monitor', 
       label: 'Interface Monitor',
       icon: Activity,
       count: null,
