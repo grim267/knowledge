@@ -11,6 +11,7 @@ import { SystemAlertPanel } from './SystemAlertPanel';
 import { UserManagement } from './UserManagement';
 import { CriticalIncidentsPanel } from './CriticalIncidentsPanel';
 import { MLModelTraining } from './MLModelTraining';
+import { EmailAlertConfiguration } from './EmailAlertConfiguration';
 import { useIncidentData } from '../hooks/useIncidentData';
 import { User } from '../types/user';
 
@@ -117,6 +118,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         return 'Recent Incidents';
       case 'detection':
         return 'Threat Detection & Anomalies';
+      case 'email-alerts':
+        return 'Email Alert Configuration';
       case 'user-management':
         return 'User Management';
       case 'critical-incidents':
