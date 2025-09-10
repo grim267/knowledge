@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { MapPin, AlertTriangle, Shield } from 'lucide-react';
 import { Incident } from '../types/incident';
-import { GlobalThreatMap } from './GlobalThreatMap';
 
 interface ThreatMapProps {
   incidents: Incident[];
@@ -22,15 +21,11 @@ export function ThreatMap({ incidents }: ThreatMapProps) {
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Global Threat Map */}
-      <GlobalThreatMap />
-      
-      {/* Legacy Local Incidents Map */}
       <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-white flex items-center">
             <MapPin className="h-6 w-6 text-blue-400 mr-2" />
-            Local Incident Map
+            Incident Map
           </h2>
           <div className="flex space-x-4 text-sm">
             <div className="flex items-center">
@@ -44,7 +39,7 @@ export function ThreatMap({ incidents }: ThreatMapProps) {
           </div>
         </div>
 
-        {/* Simulated Local Network Map */}
+        {/* Simulated Network Map */}
         <div className="relative bg-gray-900 rounded-lg p-4 h-64 mb-6 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-gray-900 to-purple-900/20"></div>
           
@@ -57,7 +52,7 @@ export function ThreatMap({ incidents }: ThreatMapProps) {
             </div>
           </div>
 
-          {/* Local incident indicators */}
+          {/* Incident indicators */}
           {recentIncidents.map((incident, index) => (
             <div
               key={incident.id}
@@ -85,7 +80,7 @@ export function ThreatMap({ incidents }: ThreatMapProps) {
           ))}
         </div>
 
-        {/* Local Incident Summary */}
+        {/* Incident Summary */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gray-900 rounded-lg p-4">
             <div className="text-red-400 text-2xl font-bold">{threatStats.critical}</div>
