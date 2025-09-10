@@ -261,80 +261,12 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
             <SystemStatus systems={safeSystemStatus} />
           </div>
         );
-      case 'alerts':
-        return (
-          <div className="space-y-6">
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Alert Summary</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-red-900/30 rounded-lg p-4">
-                  <div className="text-red-400 text-xl font-bold">
-                    {safeAlerts.filter(a => a && a.type === 'critical').length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Critical</div>
-                </div>
-                <div className="bg-orange-900/30 rounded-lg p-4">
-                  <div className="text-orange-400 text-xl font-bold">
-                    {safeAlerts.filter(a => a && a.type === 'error').length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Error</div>
-                </div>
-                <div className="bg-yellow-900/30 rounded-lg p-4">
-                  <div className="text-yellow-400 text-xl font-bold">
-                    {safeAlerts.filter(a => a && a.type === 'warning').length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Warning</div>
-                </div>
-                <div className="bg-blue-900/30 rounded-lg p-4">
-                  <div className="text-blue-400 text-xl font-bold">
-                    {safeAlerts.filter(a => a && !a.acknowledged).length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Unacknowledged</div>
-                </div>
-              </div>
-            </div>
-            <AlertPanel alerts={safeAlerts} />
-          </div>
-        );
-      case 'incidents':
-        return (
-          <div className="space-y-6">
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Incident Statistics</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-red-900/30 rounded-lg p-4">
-                  <div className="text-red-400 text-xl font-bold">{criticalIncidentsCount}</div>
-                  <div className="text-gray-400 text-sm">Critical</div>
-                </div>
-                <div className="bg-orange-900/30 rounded-lg p-4">
-                  <div className="text-orange-400 text-xl font-bold">{highIncidents}</div>
-                  <div className="text-gray-400 text-sm">High</div>
-                </div>
-                <div className="bg-yellow-900/30 rounded-lg p-4">
-                  <div className="text-yellow-400 text-xl font-bold">
-                    {safeIncidents.filter(i => i && i.severity === 'medium').length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Medium</div>
-                </div>
-                <div className="bg-green-900/30 rounded-lg p-4">
-                  <div className="text-green-400 text-xl font-bold">
-                    {safeIncidents.filter(i => i && i.status === 'resolved').length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Resolved</div>
-                </div>
-              </div>
-            </div>
-            <IncidentList incidents={safeIncidents} />
-          </div>
-        );
       case 'detection':
         return <ThreatDetectionPanel threatDetections={safeThreatDetections} anomalies={safeAnomalies} />;
       case 'email-alerts':
         return <SystemAlertPanel />;
       case 'user-management':
         return user ? <UserManagement currentUser={user} /> : null;
-      case 'critical-incidents':
-        return <CriticalIncidentsPanel />;
       case 'ml-training':
         return <MLModelTraining />;
       default:

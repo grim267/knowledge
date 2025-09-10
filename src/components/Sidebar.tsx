@@ -81,13 +81,6 @@ export function Sidebar({
       color: 'text-yellow-400'
     },
     {
-      id: 'incidents',
-      label: 'Recent Incidents',
-      icon: FileText,
-      count: stats.recentIncidents,
-      color: 'text-purple-400'
-    },
-    {
       id: 'detection',
       label: 'Threat Detection',
       icon: Brain,
@@ -100,13 +93,6 @@ export function Sidebar({
       icon: Mail,
       count: null,
       color: 'text-indigo-400'
-    },
-    {
-      id: 'critical-incidents',
-      label: 'Critical Incidents',
-      icon: AlertTriangle,
-      count: stats.criticalIncidents,
-      color: 'text-red-500'
     },
     {
       id: 'user-management',
