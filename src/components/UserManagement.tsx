@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit, Trash2, Shield, Mail, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import { User, UserRole, CreateUserData } from '../types/user';
 import { authService } from '../services/authService';
+import { MFASetup } from './MFASetup';
 
 interface UserManagementProps {
   currentUser: User;
@@ -118,6 +119,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
     setSuccess('MFA enabled successfully for user');
     loadUsers();
   };
+
   const getRoleColor = (roleLevel: number) => {
     switch (roleLevel) {
       case 1: return 'text-red-400 bg-red-900/30';
@@ -162,6 +164,7 @@ export function UserManagement({ currentUser }: UserManagementProps) {
       </div>
     );
   }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -306,14 +309,13 @@ export function UserManagement({ currentUser }: UserManagementProps) {
                   <label className="block text-sm font-medium text-gray-300 mb-2">Department</label>
                   <input
                     type="text"
-                    value={createUserData.department}
+                    value="Security Operations"
                     onChange={(e) => setCreateUserData(prev => ({ ...prev, department: e.target.value }))}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
-                    placeholder="e.g., Security Operations"
-                    disabled
-                    title="Department is automatically set to 'Security Operations'"
+                    placeholder="Security Operations"
+                    readOnly
                   />
-                  <p className="text-xs text-gray-500 mt-1">Department is automatically set to 'Security Operations'</p>
+                  <p className="text-xs text-gray-500 mt-1">Department is set to 'Security Operations'</p>
                 </div>
               </div>
             </div>
