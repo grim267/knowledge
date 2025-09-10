@@ -162,17 +162,7 @@ export function RealTimeInterfaceMonitor() {
             model_status: 'api_error',
             feature_count: 0,
             cache_size: 0,
-            total_packets: 0,
-            total_threats: 0,
-            total_blocked_ips: 0,
-            interfaces: {},
-            monitoring_active: false,
-            model_info: {
-              model_status: 'api_error',
-              feature_count: 0,
-              cache_size: 0,
-              training_data_available: 0
-            }
+            training_data_available: 0
           }
         });
       }
@@ -501,7 +491,7 @@ export function RealTimeInterfaceMonitor() {
                       )}
                     </div>
                   );
-                )}
+                })
                 .filter(component => component !== null)}
             </div>
           )}
@@ -526,44 +516,53 @@ export function RealTimeInterfaceMonitor() {
         ) : (
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {recentThreats
+              .filter(threat => 
+                threat && 
+                threat.id && 
+                threat.timestamp && 
+                threat.source_ip &&
+                threat.destination_ip &&
+                typeof threat.severity === 'number' &&
+                typeof threat.confidence === 'number'
+              )
               .map((threat) => (
-                <div key={threat.id || `threat-${Math.random()}`} className="bg-gray-900 rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center space-x-3">
-                      {getInterfaceIcon(threat.interface_type || 'ethernet')}
-                      <div>
-                        <div className="text-white text-sm font-medium">
-                          {threat.source_ip || 'Unknown'} → {threat.destination_ip || 'Unknown'}
-                        </div>
-                        <div className="text-gray-400 text-xs">
-                          {threat.interface || 'Unknown'} ({threat.interface_type || 'unknown'}) • {threat.protocol || 'Unknown'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-sm font-medium ${getSeverityColor(threat.severity || 1)}`}>
-                        Severity: {threat.severity || 1}
+              <div key={threat.id} className="bg-gray-900 rounded-lg p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    {getInterfaceIcon(threat.interface_type || 'ethernet')}
+                    <div>
+                      <div className="text-white text-sm font-medium">
+                        {threat.source_ip || 'Unknown'} → {threat.destination_ip || 'Unknown'}
                       </div>
                       <div className="text-gray-400 text-xs">
-                        {threat.timestamp ? new Date(threat.timestamp).toLocaleTimeString() : 'Unknown time'}
+                        {threat.interface || 'Unknown'} ({threat.interface_type || 'unknown'}) • {threat.protocol || 'Unknown'}
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getThreatTypeColor(threat.threat_type || 'unknown')}`}>
-                        {(threat.threat_type || 'unknown').replace('_', ' ').toUpperCase()}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        Confidence: {((threat.confidence || 0) * 100).toFixed(1)}%
-                      </span>
+                  <div className="text-right">
+                    <div className={`text-sm font-medium ${getSeverityColor(threat.severity || 1)}`}>
+                      Severity: {threat.severity || 1}
+                    </div>
+                    <div className="text-gray-400 text-xs">
+                      {threat.timestamp ? new Date(threat.timestamp).toLocaleTimeString() : 'Unknown time'}
                     </div>
                   </div>
-                  
-                  <p className="text-gray-300 text-sm mt-2">{threat.description || 'No description available'}</p>
                 </div>
-              ))}
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${getThreatTypeColor(threat.threat_type || 'unknown')}`}>
+                      {(threat.threat_type || 'unknown').replace('_', ' ').toUpperCase()}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      Confidence: {((threat.confidence || 0) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+                
+                <p className="text-gray-300 text-sm mt-2">{threat.description || 'No description available'}</p>
+              </div>
+            ))}
           </div>
         )}
       </div>
