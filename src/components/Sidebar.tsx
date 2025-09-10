@@ -88,6 +88,13 @@ export function Sidebar({
       color: 'text-purple-400'
     },
     {
+      id: 'email-alerts',
+      label: 'Email Alerts',
+      icon: Mail,
+      count: null,
+      color: 'text-green-400'
+    },
+    {
       id: 'ml-training',
       label: 'ML Model Training',
       icon: Brain,

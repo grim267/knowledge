@@ -118,12 +118,12 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         return 'Recent Incidents';
       case 'detection':
         return 'Threat Detection & Anomalies';
-      case 'email-alerts':
-        return 'Email Alert Configuration';
       case 'user-management':
         return 'User Management';
       case 'critical-incidents':
         return 'Critical Incidents';
+      case 'email-alerts':
+        return 'Email Alert Configuration';
       default:
         return 'Dashboard Overview';
     }
@@ -220,8 +220,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         return <CriticalIncidentsPanel criticalIncidents={safeCriticalIncidents} />;
       case 'detection':
         return <ThreatDetectionPanel threatDetections={safeThreatDetections} anomalies={safeAnomalies} />;
-      case 'email-alerts':
-        return <SystemAlertPanel />;
       case 'ml-training':
         return <MLModelTraining />;
       case 'email-alerts':
