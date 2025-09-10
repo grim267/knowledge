@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, Ethernet, Activity, Shield, Brain, AlertTriangle, Play, Square, RefreshCw } from 'lucide-react';
+import { Wifi, Feather as Ethernet, Activity, Shield, Brain, AlertTriangle, Play, Square, RefreshCw } from 'lucide-react';
 
 interface InterfaceStats {
   name: string;
