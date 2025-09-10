@@ -124,6 +124,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         return 'Critical Incidents';
       case 'email-alerts':
         return 'Email Alert Configuration';
+      case 'interface-monitor':
+        return 'Real-Time Interface Monitor';
       default:
         return 'Dashboard Overview';
     }
@@ -224,8 +226,23 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         return <MLModelTraining />;
       case 'email-alerts':
         return <EmailAlertConfiguration />;
-      case 'interface-monitor':
-        return <RealTimeInterfaceMonitor />;
+      case 'interface-monitor': {
+        // Import the component dynamically to avoid import errors
+        const RealTimeInterfaceMonitor = React.lazy(() => 
+          import('./RealTimeInterfaceMonitor').then(module => ({ default: module.RealTimeInterfaceMonitor }))
+        );
+        
+        return (
+          <React.Suspense fallback={
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+              <span className="ml-2 text-gray-400">Loading interface monitor...</span>
+            </div>
+          }>
+            <RealTimeInterfaceMonitor />
+          </React.Suspense>
+        );
+      }
       default:
         return (
           <>

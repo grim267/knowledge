@@ -97,10 +97,14 @@ export function RealTimeInterfaceMonitor() {
       const response = await fetch(`${monitorApiUrl}/api/stats`);
       if (response.ok) {
         const monitoringStats = await response.json();
-        setStats(monitoringStats);
+        // Validate stats data before setting
+        if (monitoringStats && typeof monitoringStats === 'object') {
+          setStats(monitoringStats);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch monitoring stats:', error);
+      addToLog('❌ Failed to fetch monitoring stats');
     }
   };
 
@@ -109,24 +113,37 @@ export function RealTimeInterfaceMonitor() {
       const response = await fetch(`${monitorApiUrl}/api/threats/recent?limit=20`);
       if (response.ok) {
         const threats = await response.json();
-        setRecentThreats(threats.threats || []);
+        // Validate threats data before setting
+        if (threats && Array.isArray(threats.threats)) {
+          setRecentThreats(threats.threats);
+        } else {
+          setRecentThreats([]);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch recent threats:', error);
+      addToLog('❌ Failed to fetch recent threats');
     }
   };
 
   const startMonitoring = async () => {
+    if (!isConnected) {
+      addToLog('❌ Cannot start monitoring - not connected to monitor API');
+      return;
+    }
+
     try {
       const response = await fetch(`${monitorApiUrl}/api/start`, {
         method: 'POST'
       });
       
       if (response.ok) {
+        const result = await response.json();
         setIsMonitoring(true);
-        addToLog('🚀 Started real-time interface monitoring');
+        addToLog(`🚀 Started real-time interface monitoring: ${result.message || 'Success'}`);
       } else {
-        addToLog('❌ Failed to start monitoring');
+        const errorData = await response.text();
+        addToLog(`❌ Failed to start monitoring: ${errorData}`);
       }
     } catch (error) {
       addToLog(`❌ Error starting monitoring: ${error}`);
@@ -143,7 +160,8 @@ export function RealTimeInterfaceMonitor() {
         setIsMonitoring(false);
         addToLog('🛑 Stopped real-time interface monitoring');
       } else {
-        addToLog('❌ Failed to stop monitoring');
+        const errorData = await response.text();
+        addToLog(`❌ Failed to stop monitoring: ${errorData}`);
       }
     } catch (error) {
       addToLog(`❌ Error stopping monitoring: ${error}`);
@@ -244,7 +262,7 @@ export function RealTimeInterfaceMonitor() {
             </div>
             <div className="bg-gray-900 rounded-lg p-4">
               <div className="text-green-400 text-2xl font-bold">
-                {Object.keys(stats.interfaces).filter(i => stats.interfaces[i].active).length}
+                {stats.interfaces ? Object.keys(stats.interfaces).filter(i => stats.interfaces[i]?.active).length : 0}
               </div>
               <div className="text-gray-400 text-sm">Active Interfaces</div>
             </div>
@@ -252,7 +270,7 @@ export function RealTimeInterfaceMonitor() {
         )}
 
         {/* Model Status */}
-        {stats && (
+        {stats && stats.model_info && (
           <div className="bg-purple-900/20 border border-purple-700/50 rounded-lg p-4">
             <h4 className="text-purple-300 font-medium mb-2">ML Model Status</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -278,12 +296,19 @@ export function RealTimeInterfaceMonitor() {
       </div>
 
       {/* Interface Status */}
-      {stats && (
+      {stats && stats.interfaces && (
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <h3 className="text-lg font-semibold text-white mb-4">Network Interfaces</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(stats.interfaces).map(([name, interfaceStats]) => (
+          {Object.keys(stats.interfaces).length === 0 ? (
+            <div className="text-center py-8">
+              <Activity className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-400">No network interfaces detected</p>
+              <p className="text-gray-500 text-sm">Start the real-time monitor to detect interfaces</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(stats.interfaces).filter(([name, interfaceStats]) => interfaceStats && name).map(([name, interfaceStats]) => (
               <div key={name} className="bg-gray-900 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-2">
@@ -322,7 +347,7 @@ export function RealTimeInterfaceMonitor() {
                 </div>
 
                 {/* Protocol Distribution */}
-                {Object.keys(interfaceStats.protocol_distribution).length > 0 && (
+                {interfaceStats.protocol_distribution && Object.keys(interfaceStats.protocol_distribution).length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-700">
                     <p className="text-xs text-gray-400 mb-2">Protocol Distribution:</p>
                     <div className="flex space-x-2">
@@ -335,8 +360,9 @@ export function RealTimeInterfaceMonitor() {
                   </div>
                 )}
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -347,14 +373,17 @@ export function RealTimeInterfaceMonitor() {
           Recent Interface Threats
         </h3>
         
-        {recentThreats.length === 0 ? (
+        {!recentThreats || recentThreats.length === 0 ? (
           <div className="text-center py-8">
             <Shield className="h-12 w-12 text-gray-400 mx-auto mb-3" />
             <p className="text-gray-400">No threats detected on monitored interfaces</p>
+            {!isMonitoring && isConnected && (
+              <p className="text-gray-500 text-sm mt-2">Click "Start Monitoring" to begin threat detection</p>
+            )}
           </div>
         ) : (
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {recentThreats.map((threat) => (
+            {recentThreats.filter(threat => threat && threat.id && threat.timestamp).map((threat) => (
               <div key={threat.id} className="bg-gray-900 rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center space-x-3">
@@ -373,7 +402,7 @@ export function RealTimeInterfaceMonitor() {
                       Severity: {threat.severity}
                     </div>
                     <div className="text-gray-400 text-xs">
-                      {new Date(threat.timestamp).toLocaleTimeString()}
+                      {threat.timestamp ? new Date(threat.timestamp).toLocaleTimeString() : 'Unknown time'}
                     </div>
                   </div>
                 </div>
