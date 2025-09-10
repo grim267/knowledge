@@ -51,6 +51,11 @@ def main():
             'script': 'email_service_backend.py',
             'port': 8004,
             'name': 'Email Service Backend'
+        },
+        {
+            'script': 'real_time_monitor_api.py',
+            'port': 8005,
+            'name': 'Real-Time Interface Monitor API'
         }
     ]
     

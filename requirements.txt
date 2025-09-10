@@ -11,3 +11,6 @@ python-socketio
 
 # Email service dependencies
 secure-smtplib
+
+# Real-time monitoring dependencies
+scapy>=2.5.0

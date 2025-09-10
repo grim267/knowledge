@@ -224,6 +224,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         return <MLModelTraining />;
       case 'email-alerts':
         return <EmailAlertConfiguration />;
+      case 'interface-monitor':
+        return <RealTimeInterfaceMonitor />;
       default:
         return (
           <>
