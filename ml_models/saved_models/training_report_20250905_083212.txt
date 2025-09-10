@@ -1,0 +1,29 @@
+THREAT DETECTION MODEL TRAINING REPORT
+==================================================
+
+Training Date: 2025-09-05T08:32:12.236950
+Training Time: 0.61 seconds
+Training Samples: 40
+Test Samples: 10
+
+PERFORMANCE METRICS:
+Accuracy: 0.200
+Precision: 0.040
+Recall: 0.200
+F1 Score: 0.067
+AUC Score: 0.500
+
+TOP FEATURE IMPORTANCE:
+protocol_diversity: 0.000
+connection_frequency: 0.000
+time_between_connections: 0.000
+geographic_distance: 0.000
+reputation_score: 0.000
+payload_entropy: 0.000
+suspicious_strings: 0.000
+base64_content: 0.000
+encrypted_content: 0.000
+hour_of_day: 0.000
+
+Confusion Matrix:
+[[0, 0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 0, 2], [0, 0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 0, 2], [0, 0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 0, 2]]

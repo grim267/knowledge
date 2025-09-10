@@ -1,0 +1,105 @@
+{
+  "feature_names": [
+    "packet_size",
+    "connection_duration",
+    "bytes_transferred",
+    "packets_per_second",
+    "unique_ports",
+    "protocol_diversity",
+    "connection_frequency",
+    "time_between_connections",
+    "geographic_distance",
+    "reputation_score",
+    "payload_entropy",
+    "suspicious_strings",
+    "base64_content",
+    "encrypted_content",
+    "hour_of_day",
+    "day_of_week",
+    "is_weekend",
+    "source_ip_class",
+    "is_tor_exit",
+    "is_vpn",
+    "country_risk_score",
+    "tcp_flags_anomaly",
+    "port_scan_indicator",
+    "ddos_indicator",
+    "malware_signature_count"
+  ],
+  "threat_categories": [
+    "benign",
+    "malware",
+    "botnet",
+    "ddos",
+    "brute_force",
+    "sql_injection",
+    "xss",
+    "phishing",
+    "ransomware",
+    "apt",
+    "port_scan",
+    "data_exfiltration",
+    "lateral_movement"
+  ],
+  "model_config": {
+    "random_forest": {
+      "n_estimators": 200,
+      "max_depth": 20,
+      "min_samples_split": 5,
+      "min_samples_leaf": 2,
+      "max_features": "sqrt",
+      "random_state": 42,
+      "n_jobs": -1,
+      "class_weight": "balanced"
+    },
+    "isolation_forest": {
+      "contamination": 0.1,
+      "random_state": 42,
+      "n_jobs": -1
+    }
+  },
+  "metrics": {
+    "accuracy": 0.375,
+    "precision": 0.44999999999999996,
+    "recall": 0.375,
+    "f1_score": 0.40909090909090906,
+    "auc_score": 0.0,
+    "training_samples": 30,
+    "test_samples": 8,
+    "feature_importance": {
+      "packet_size": 1.0,
+      "connection_frequency": 0.0,
+      "time_between_connections": 0.0,
+      "geographic_distance": 0.0,
+      "reputation_score": 0.0,
+      "payload_entropy": 0.0,
+      "suspicious_strings": 0.0,
+      "base64_content": 0.0,
+      "encrypted_content": 0.0,
+      "hour_of_day": 0.0,
+      "day_of_week": 0.0,
+      "is_weekend": 0.0,
+      "source_ip_class": 0.0,
+      "is_tor_exit": 0.0,
+      "is_vpn": 0.0,
+      "country_risk_score": 0.0,
+      "tcp_flags_anomaly": 0.0,
+      "port_scan_indicator": 0.0,
+      "ddos_indicator": 0.0,
+      "malware_signature_count": 0.0
+    },
+    "confusion_matrix": [
+      [
+        3,
+        3
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "training_time": 0.85525,
+    "last_trained": "2025-09-09T17:04:45.071598"
+  },
+  "saved_at": "2025-09-09T17:04:45.172506"
+}
