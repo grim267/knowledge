@@ -47,29 +47,24 @@ export function RealTimeInterfaceMonitor() {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [monitoringLog, setMonitoringLog] = useState<string[]>([]);
+  const [availableInterfaces, setAvailableInterfaces] = useState<Array<{name: string, type: string, is_up: boolean}>>([]);
 
   const monitorApiUrl = 'http://localhost:8005'; // Real-time monitor API
 
   useEffect(() => {
     checkMonitorConnection();
+    fetchAvailableInterfaces();
     
     // Set up periodic stats refresh
     const statsInterval = setInterval(() => {
       if (isConnected) {
         fetchMonitoringStats();
+        fetchRecentThreats();
       }
     }, 5000);
 
-    // Set up real-time threat updates
-    const threatInterval = setInterval(() => {
-      if (isConnected) {
-        fetchRecentThreats();
-      }
-    }, 2000);
-
     return () => {
       clearInterval(statsInterval);
-      clearInterval(threatInterval);
     };
   }, [isConnected]);
 
@@ -92,19 +87,81 @@ export function RealTimeInterfaceMonitor() {
     }
   };
 
+  const fetchAvailableInterfaces = async () => {
+    try {
+      const response = await fetch(`${monitorApiUrl}/api/interfaces`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && Array.isArray(data.interfaces)) {
+          setAvailableInterfaces(data.interfaces);
+          addToLog(`📡 Found ${data.interfaces.length} network interfaces`);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch interfaces:', error);
+      setAvailableInterfaces([]);
+    }
+  };
+
   const fetchMonitoringStats = async () => {
     try {
       const response = await fetch(`${monitorApiUrl}/api/stats`);
       if (response.ok) {
         const monitoringStats = await response.json();
-        // Validate stats data before setting
-        if (monitoringStats && typeof monitoringStats === 'object') {
+        // Validate and sanitize stats data
+        if (monitoringStats && typeof monitoringStats === 'object' && monitoringStats.interfaces) {
+          // Ensure interfaces object exists and is valid
+          const validatedStats = {
+            ...monitoringStats,
+            interfaces: monitoringStats.interfaces || {},
+            total_packets: monitoringStats.total_packets || 0,
+            total_threats: monitoringStats.total_threats || 0,
+            total_blocked_ips: monitoringStats.total_blocked_ips || 0,
+            monitoring_active: monitoringStats.monitoring_active || false,
+            model_info: monitoringStats.model_info || {
+              model_status: 'unknown',
+              feature_count: 0,
+              cache_size: 0,
+              training_data_available: 0
+            }
+          };
           setStats(monitoringStats);
+        } else {
+          // Set default stats if invalid data received
+          setStats({
+            total_packets: 0,
+            total_threats: 0,
+            total_blocked_ips: 0,
+            interfaces: {},
+            monitoring_active: false,
+            model_info: {
+              model_status: 'not_loaded',
+              feature_count: 0,
+              cache_size: 0,
+              training_data_available: 0
+            }
+          });
         }
+      } else {
+        addToLog('❌ Failed to fetch monitoring stats');
       }
     } catch (error) {
       console.error('Failed to fetch monitoring stats:', error);
       addToLog('❌ Failed to fetch monitoring stats');
+      // Set safe default stats on error
+      setStats({
+        total_packets: 0,
+        total_threats: 0,
+        total_blocked_ips: 0,
+        interfaces: {},
+        monitoring_active: false,
+        model_info: {
+          model_status: 'error',
+          feature_count: 0,
+          cache_size: 0,
+          training_data_available: 0
+        }
+      });
     }
   };
 
@@ -113,16 +170,29 @@ export function RealTimeInterfaceMonitor() {
       const response = await fetch(`${monitorApiUrl}/api/threats/recent?limit=20`);
       if (response.ok) {
         const threats = await response.json();
-        // Validate threats data before setting
-        if (threats && Array.isArray(threats.threats)) {
+        // Validate and filter threats data
+        if (threats && threats.threats && Array.isArray(threats.threats)) {
+          // Filter out invalid threats
+          const validThreats = threats.threats.filter(threat => 
+            threat && 
+            threat.id && 
+            threat.timestamp && 
+            threat.source_ip &&
+            typeof threat.severity === 'number' &&
+            typeof threat.confidence === 'number'
+          );
           setRecentThreats(threats.threats);
         } else {
+          addToLog('⚠️ Invalid threat data received');
           setRecentThreats([]);
         }
+      } else {
+        addToLog('❌ Failed to fetch recent threats');
+        setRecentThreats([]);
       }
     } catch (error) {
       console.error('Failed to fetch recent threats:', error);
-      addToLog('❌ Failed to fetch recent threats');
+      setRecentThreats([]);
     }
   };
 
@@ -133,6 +203,7 @@ export function RealTimeInterfaceMonitor() {
     }
 
     try {
+      addToLog('🚀 Starting real-time interface monitoring...');
       const response = await fetch(`${monitorApiUrl}/api/start`, {
         method: 'POST'
       });
@@ -140,7 +211,12 @@ export function RealTimeInterfaceMonitor() {
       if (response.ok) {
         const result = await response.json();
         setIsMonitoring(true);
-        addToLog(`🚀 Started real-time interface monitoring: ${result.message || 'Success'}`);
+        addToLog(`✅ Monitoring started: ${result.message || 'Success'}`);
+        // Immediately fetch stats after starting
+        setTimeout(() => {
+          fetchMonitoringStats();
+          fetchRecentThreats();
+        }, 1000);
       } else {
         const errorData = await response.text();
         addToLog(`❌ Failed to start monitoring: ${errorData}`);
@@ -152,13 +228,14 @@ export function RealTimeInterfaceMonitor() {
 
   const stopMonitoring = async () => {
     try {
+      addToLog('🛑 Stopping real-time interface monitoring...');
       const response = await fetch(`${monitorApiUrl}/api/stop`, {
         method: 'POST'
       });
       
       if (response.ok) {
         setIsMonitoring(false);
-        addToLog('🛑 Stopped real-time interface monitoring');
+        addToLog('✅ Monitoring stopped successfully');
       } else {
         const errorData = await response.text();
         addToLog(`❌ Failed to stop monitoring: ${errorData}`);
@@ -305,10 +382,30 @@ export function RealTimeInterfaceMonitor() {
               <Activity className="h-12 w-12 text-gray-400 mx-auto mb-3" />
               <p className="text-gray-400">No network interfaces detected</p>
               <p className="text-gray-500 text-sm">Start the real-time monitor to detect interfaces</p>
+              {availableInterfaces.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-gray-400 text-sm">Available interfaces:</p>
+                  <div className="flex flex-wrap justify-center gap-2 mt-2">
+                    {availableInterfaces.map(iface => (
+                      <span key={iface.name} className="text-xs px-2 py-1 bg-gray-700 text-gray-300 rounded">
+                        {iface.name} ({iface.type})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(stats.interfaces).filter(([name, interfaceStats]) => interfaceStats && name).map(([name, interfaceStats]) => (
+              {Object.entries(stats.interfaces)
+                .filter(([name, interfaceStats]) => 
+                  name && 
+                  interfaceStats && 
+                  typeof interfaceStats === 'object' &&
+                  typeof interfaceStats.packets === 'number' &&
+                  typeof interfaceStats.threats === 'number'
+                )
+                .map(([name, interfaceStats]) => (
               <div key={name} className="bg-gray-900 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-2">
@@ -325,22 +422,22 @@ export function RealTimeInterfaceMonitor() {
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <div className="text-blue-400 text-lg font-bold">{interfaceStats.packets.toLocaleString()}</div>
+                    <div className="text-blue-400 text-lg font-bold">{(interfaceStats.packets || 0).toLocaleString()}</div>
                     <div className="text-gray-400 text-xs">Packets</div>
                   </div>
                   <div>
-                    <div className="text-red-400 text-lg font-bold">{interfaceStats.threats}</div>
+                    <div className="text-red-400 text-lg font-bold">{interfaceStats.threats || 0}</div>
                     <div className="text-gray-400 text-xs">Threats</div>
                   </div>
                   <div>
                     <div className="text-green-400 text-lg font-bold">
-                      {(interfaceStats.bytes / 1024 / 1024).toFixed(1)}MB
+                      {((interfaceStats.bytes || 0) / 1024 / 1024).toFixed(1)}MB
                     </div>
                     <div className="text-gray-400 text-xs">Data</div>
                   </div>
                   <div>
                     <div className="text-orange-400 text-lg font-bold">
-                      {interfaceStats.threat_rate.toFixed(2)}%
+                      {(interfaceStats.threat_rate || 0).toFixed(2)}%
                     </div>
                     <div className="text-gray-400 text-xs">Threat Rate</div>
                   </div>
@@ -351,16 +448,18 @@ export function RealTimeInterfaceMonitor() {
                   <div className="mt-3 pt-3 border-t border-gray-700">
                     <p className="text-xs text-gray-400 mb-2">Protocol Distribution:</p>
                     <div className="flex space-x-2">
-                      {Object.entries(interfaceStats.protocol_distribution).map(([protocol, count]) => (
+                      {Object.entries(interfaceStats.protocol_distribution)
+                        .filter(([protocol, count]) => protocol && typeof count === 'number')
+                        .map(([protocol, count]) => (
                         <span key={protocol} className="text-xs px-2 py-1 bg-gray-800 text-gray-300 rounded">
                           {protocol}: {count}
                         </span>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 )}
               </div>
-              ))}
+                ))}
             </div>
           )}
         </div>
@@ -383,23 +482,33 @@ export function RealTimeInterfaceMonitor() {
           </div>
         ) : (
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {recentThreats.filter(threat => threat && threat.id && threat.timestamp).map((threat) => (
+            {recentThreats
+              .filter(threat => 
+                threat && 
+                threat.id && 
+                threat.timestamp && 
+                threat.source_ip &&
+                threat.destination_ip &&
+                typeof threat.severity === 'number' &&
+                typeof threat.confidence === 'number'
+              )
+              .map((threat) => (
               <div key={threat.id} className="bg-gray-900 rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center space-x-3">
-                    {getInterfaceIcon(threat.interface_type)}
+                    {getInterfaceIcon(threat.interface_type || 'ethernet')}
                     <div>
                       <div className="text-white text-sm font-medium">
-                        {threat.source_ip} → {threat.destination_ip}
+                        {threat.source_ip || 'Unknown'} → {threat.destination_ip || 'Unknown'}
                       </div>
                       <div className="text-gray-400 text-xs">
-                        {threat.interface} ({threat.interface_type}) • {threat.protocol}
+                        {threat.interface || 'Unknown'} ({threat.interface_type || 'unknown'}) • {threat.protocol || 'Unknown'}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className={`text-sm font-medium ${getSeverityColor(threat.severity)}`}>
-                      Severity: {threat.severity}
+                    <div className={`text-sm font-medium ${getSeverityColor(threat.severity || 1)}`}>
+                      Severity: {threat.severity || 1}
                     </div>
                     <div className="text-gray-400 text-xs">
                       {threat.timestamp ? new Date(threat.timestamp).toLocaleTimeString() : 'Unknown time'}
@@ -409,16 +518,16 @@ export function RealTimeInterfaceMonitor() {
                 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getThreatTypeColor(threat.threat_type)}`}>
-                      {threat.threat_type.replace('_', ' ').toUpperCase()}
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${getThreatTypeColor(threat.threat_type || 'unknown')}`}>
+                      {(threat.threat_type || 'unknown').replace('_', ' ').toUpperCase()}
                     </span>
                     <span className="text-xs text-gray-400">
-                      Confidence: {(threat.confidence * 100).toFixed(1)}%
+                      Confidence: {((threat.confidence || 0) * 100).toFixed(1)}%
                     </span>
                   </div>
                 </div>
                 
-                <p className="text-gray-300 text-sm mt-2">{threat.description}</p>
+                <p className="text-gray-300 text-sm mt-2">{threat.description || 'No description available'}</p>
               </div>
             ))}
           </div>
@@ -463,20 +572,16 @@ export function RealTimeInterfaceMonitor() {
           <div className="bg-gray-900 rounded-lg p-4">
             <h4 className="text-white font-medium mb-2">2. Run with Privileges</h4>
             <div className="space-y-1 text-sm">
-              <div><strong>Linux/macOS:</strong> <code className="text-green-400">sudo python real_time_interface_monitor.py</code></div>
-              <div><strong>Windows:</strong> Run as Administrator</div>
+              <div className="text-gray-300"><strong className="text-white">Linux/macOS:</strong> <code className="text-green-400 bg-gray-800 px-1 rounded">sudo python real_time_interface_monitor.py</code></div>
+              <div className="text-gray-300"><strong className="text-white">Windows:</strong> Run Command Prompt as Administrator</div>
             </div>
             <p className="text-gray-400 text-xs mt-1">Required for raw packet capture</p>
           </div>
           
           <div className="bg-gray-900 rounded-lg p-4">
-            <h4 className="text-white font-medium mb-2">3. Monitor All Interfaces</h4>
-            <p className="text-gray-300 text-sm">The system automatically detects and monitors:</p>
-            <ul className="list-disc list-inside text-gray-400 text-xs mt-1">
-              <li>Wi-Fi interfaces (wlan, wifi)</li>
-              <li>Ethernet interfaces (eth, en, em)</li>
-              <li>All active network adapters</li>
-            </ul>
+            <h4 className="text-white font-medium mb-2">3. Start API Server</h4>
+            <code className="text-green-400 text-sm bg-gray-800 px-1 rounded">python real_time_monitor_api.py</code>
+            <p className="text-gray-400 text-xs mt-1">Provides REST API for dashboard integration</p>
           </div>
           
           <div className="bg-gray-900 rounded-lg p-4">
@@ -486,9 +591,30 @@ export function RealTimeInterfaceMonitor() {
               <li>Real-time threat classification</li>
               <li>Automatic retraining with new data</li>
               <li>25+ advanced features for threat detection</li>
+              <li>Wi-Fi and Ethernet interface monitoring</li>
+              <li>Behavioral anomaly detection</li>
             </ul>
           </div>
         </div>
+        
+        {/* Available Interfaces Display */}
+        {availableInterfaces.length > 0 && (
+          <div className="mt-6 bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
+            <h4 className="text-blue-300 font-medium mb-2">Detected Network Interfaces</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {availableInterfaces.map(iface => (
+                <div key={iface.name} className="flex items-center space-x-2 text-sm">
+                  {getInterfaceIcon(iface.type)}
+                  <span className="text-white">{iface.name}</span>
+                  <span className="text-xs px-1 py-0.5 bg-blue-800 text-blue-200 rounded">
+                    {iface.type}
+                  </span>
+                  <div className={`w-2 h-2 rounded-full ${iface.is_up ? 'bg-green-400' : 'bg-red-400'}`} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
