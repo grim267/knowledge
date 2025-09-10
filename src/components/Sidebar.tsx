@@ -74,25 +74,11 @@ export function Sidebar({
       color: 'text-blue-400'
     },
     {
-      id: 'alerts',
-      label: 'Active Alerts',
-      icon: Bell,
-      count: stats.activeAlerts,
-      color: 'text-yellow-400'
-    },
-    {
       id: 'detection',
       label: 'Threat Detection',
       icon: Brain,
       count: null,
       color: 'text-cyan-400'
-    },
-    {
-      id: 'email-alerts',
-      label: 'Email Alert System',
-      icon: Mail,
-      count: null,
-      color: 'text-indigo-400'
     },
     {
       id: 'user-management',

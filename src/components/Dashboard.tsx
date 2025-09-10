@@ -105,22 +105,14 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     switch (activeSection) {
       case 'threats':
         return 'Active Threats';
-      case 'critical':
-        return 'Critical Incidents';
       case 'network':
         return 'Network Traffic Monitor';
       case 'systems':
         return 'Systems Status';
-      case 'alerts':
-        return 'Active Alerts';
-      case 'incidents':
-        return 'Recent Incidents';
       case 'detection':
         return 'Threat Detection & Anomalies';
       case 'user-management':
         return 'User Management';
-      case 'critical-incidents':
-        return 'Critical Incidents';
       default:
         return 'Dashboard Overview';
     }
