@@ -11,7 +11,6 @@ import { UserManagement } from './UserManagement';
 import { MLModelTraining } from './MLModelTraining';
 import { EmailAlertConfiguration } from './EmailAlertConfiguration';
 import { RealTimeInterfaceMonitor } from './RealTimeInterfaceMonitor';
-import { RealTimeInterfaceMonitor } from './RealTimeInterfaceMonitor';
 import { useIncidentData } from '../hooks/useIncidentData';
 import { User } from '../types/user';
 
