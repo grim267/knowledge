@@ -100,6 +100,13 @@ export function Sidebar({
       icon: Brain,
       count: null,
       color: 'text-purple-500'
+    },
+    {
+      id: 'interface-monitor',
+      label: 'Interface Monitor',
+      icon: Activity,
+      count: null,
+      color: 'text-green-500'
     }
   ];
 
