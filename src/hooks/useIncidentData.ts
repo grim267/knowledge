@@ -142,6 +142,18 @@ export function useIncidentData() {
       
       setIncidents(prev => [incident, ...prev.slice(0, 49)])
       
+      // Send email alert for backend threats
+      emailService.processAlert({
+        type: 'threat',
+        threatType: threat.threat_type,
+        severity: threat.severity >= 8 ? 'critical' : threat.severity >= 6 ? 'high' : 'medium',
+        sourceIp: threat.source_ip,
+        description: threat.description,
+        timestamp: new Date(threat.timestamp),
+        indicators: threat.indicators,
+        affectedSystems: threat.destination_ip ? [threat.destination_ip] : []
+      }).catch(console.error)
+      
       // Also create an alert
       const alert: Alert = {
         id: `ALT-${threat.id}`,
