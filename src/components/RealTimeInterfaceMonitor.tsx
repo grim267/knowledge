@@ -108,46 +108,77 @@ export function RealTimeInterfaceMonitor() {
       const response = await fetch(`${monitorApiUrl}/api/stats`);
       if (response.ok) {
         const monitoringStats = await response.json();
+        
         // Validate and sanitize stats data
-        if (monitoringStats && typeof monitoringStats === 'object' && monitoringStats.interfaces) {
-          // Ensure interfaces object exists and is valid
-          const validatedStats = {
-            ...monitoringStats,
-            interfaces: monitoringStats.interfaces || {},
-            total_packets: monitoringStats.total_packets || 0,
-            total_threats: monitoringStats.total_threats || 0,
-            total_blocked_ips: monitoringStats.total_blocked_ips || 0,
-            monitoring_active: monitoringStats.monitoring_active || false,
-            model_info: monitoringStats.model_info || {
-              model_status: 'unknown',
-              feature_count: 0,
-              cache_size: 0,
-              training_data_available: 0
+        const validatedStats = {
+          total_packets: monitoringStats?.total_packets || 0,
+          total_threats: monitoringStats?.total_threats || 0,
+          total_blocked_ips: monitoringStats?.total_blocked_ips || 0,
+          interfaces: {},
+          monitoring_active: monitoringStats?.monitoring_active || false,
+          model_info: {
+            model_status: monitoringStats?.model_info?.model_status || 'unknown',
+            feature_count: monitoringStats?.model_info?.feature_count || 0,
+            cache_size: monitoringStats?.model_info?.cache_size || 0,
+            training_data_available: monitoringStats?.model_info?.training_data_available || 0
+          }
+        };
+        
+        // Safely process interfaces
+        if (monitoringStats?.interfaces && typeof monitoringStats.interfaces === 'object') {
+          const validInterfaces: Record<string, InterfaceStats> = {};
+          
+          for (const [name, interfaceData] of Object.entries(monitoringStats.interfaces)) {
+            if (name && interfaceData && typeof interfaceData === 'object') {
+              const iface = interfaceData as any;
+              validInterfaces[name] = {
+                name: name,
+                type: (iface.type === 'wifi' || iface.type === 'ethernet') ? iface.type : 'ethernet',
+                packets: typeof iface.packets === 'number' ? iface.packets : 0,
+                threats: typeof iface.threats === 'number' ? iface.threats : 0,
+                bytes: typeof iface.bytes === 'number' ? iface.bytes : 0,
+                threat_rate: typeof iface.threat_rate === 'number' ? iface.threat_rate : 0,
+                active: typeof iface.active === 'boolean' ? iface.active : false,
+                protocol_distribution: (iface.protocol_distribution && typeof iface.protocol_distribution === 'object') ? iface.protocol_distribution : {},
+                threat_types: (iface.threat_types && typeof iface.threat_types === 'object') ? iface.threat_types : {}
+              };
             }
-          };
-          setStats(monitoringStats);
-        } else {
-          // Set default stats if invalid data received
-          setStats({
+          }
+          
+          validatedStats.interfaces = validInterfaces;
+        }
+        
+        setStats(validatedStats);
+      } else {
+        addToLog(`❌ Failed to fetch monitoring stats: ${response.status}`);
+        // Set safe default stats on API error
+        setStats({
+          total_packets: 0,
+          total_threats: 0,
+          total_blocked_ips: 0,
+          interfaces: {},
+          monitoring_active: false,
+          model_info: {
+            model_status: 'api_error',
+            feature_count: 0,
+            cache_size: 0,
             total_packets: 0,
             total_threats: 0,
             total_blocked_ips: 0,
             interfaces: {},
             monitoring_active: false,
             model_info: {
-              model_status: 'not_loaded',
+              model_status: 'api_error',
               feature_count: 0,
               cache_size: 0,
               training_data_available: 0
             }
-          });
-        }
-      } else {
-        addToLog('❌ Failed to fetch monitoring stats');
+          }
+        });
       }
     } catch (error) {
       console.error('Failed to fetch monitoring stats:', error);
-      addToLog('❌ Failed to fetch monitoring stats');
+      addToLog(`❌ Failed to fetch monitoring stats: ${error}`);
       // Set safe default stats on error
       setStats({
         total_packets: 0,
@@ -156,7 +187,7 @@ export function RealTimeInterfaceMonitor() {
         interfaces: {},
         monitoring_active: false,
         model_info: {
-          model_status: 'error',
+          model_status: 'connection_error',
           feature_count: 0,
           cache_size: 0,
           training_data_available: 0
@@ -169,29 +200,34 @@ export function RealTimeInterfaceMonitor() {
     try {
       const response = await fetch(`${monitorApiUrl}/api/threats/recent?limit=20`);
       if (response.ok) {
-        const threats = await response.json();
+        const threatsResponse = await response.json();
         // Validate and filter threats data
-        if (threats && threats.threats && Array.isArray(threats.threats)) {
+        if (threatsResponse && threatsResponse.threats && Array.isArray(threatsResponse.threats)) {
           // Filter out invalid threats
-          const validThreats = threats.threats.filter(threat => 
+          const validThreats = threatsResponse.threats.filter((threat: any) => 
             threat && 
             threat.id && 
             threat.timestamp && 
             threat.source_ip &&
+            threat.destination_ip &&
             typeof threat.severity === 'number' &&
             typeof threat.confidence === 'number'
           );
-          setRecentThreats(threats.threats);
+          setRecentThreats(validThreats);
+          if (validThreats.length > 0) {
+            addToLog(`📊 Loaded ${validThreats.length} recent threats`);
+          }
         } else {
           addToLog('⚠️ Invalid threat data received');
           setRecentThreats([]);
         }
       } else {
-        addToLog('❌ Failed to fetch recent threats');
+        addToLog(`❌ Failed to fetch recent threats: ${response.status}`);
         setRecentThreats([]);
       }
     } catch (error) {
       console.error('Failed to fetch recent threats:', error);
+      addToLog(`❌ Error fetching threats: ${error}`);
       setRecentThreats([]);
     }
   };
@@ -398,68 +434,75 @@ export function RealTimeInterfaceMonitor() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Object.entries(stats.interfaces)
-                .filter(([name, interfaceStats]) => 
-                  name && 
-                  interfaceStats && 
-                  typeof interfaceStats === 'object' &&
-                  typeof interfaceStats.packets === 'number' &&
-                  typeof interfaceStats.threats === 'number'
-                )
-                .map(([name, interfaceStats]) => (
-              <div key={name} className="bg-gray-900 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    {getInterfaceIcon(interfaceStats.type)}
-                    <span className="text-white font-medium">{name}</span>
-                    <span className="text-xs px-2 py-1 bg-blue-900/50 text-blue-300 rounded">
-                      {interfaceStats.type.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className={`w-3 h-3 rounded-full ${
-                    interfaceStats.active ? 'bg-green-400 animate-pulse' : 'bg-red-400'
-                  }`} />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <div className="text-blue-400 text-lg font-bold">{(interfaceStats.packets || 0).toLocaleString()}</div>
-                    <div className="text-gray-400 text-xs">Packets</div>
-                  </div>
-                  <div>
-                    <div className="text-red-400 text-lg font-bold">{interfaceStats.threats || 0}</div>
-                    <div className="text-gray-400 text-xs">Threats</div>
-                  </div>
-                  <div>
-                    <div className="text-green-400 text-lg font-bold">
-                      {((interfaceStats.bytes || 0) / 1024 / 1024).toFixed(1)}MB
-                    </div>
-                    <div className="text-gray-400 text-xs">Data</div>
-                  </div>
-                  <div>
-                    <div className="text-orange-400 text-lg font-bold">
-                      {(interfaceStats.threat_rate || 0).toFixed(2)}%
-                    </div>
-                    <div className="text-gray-400 text-xs">Threat Rate</div>
-                  </div>
-                </div>
+                .map(([name, interfaceData]) => {
+                  // Validate interface data
+                  if (!name || !interfaceData || typeof interfaceData !== 'object') {
+                    return null;
+                  }
+                  
+                  const interfaceStats = interfaceData as InterfaceStats;
+                  
+                  return (
+                    <div key={name} className="bg-gray-900 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          {getInterfaceIcon(interfaceStats.type || 'ethernet')}
+                          <span className="text-white font-medium">{name}</span>
+                          <span className="text-xs px-2 py-1 bg-blue-900/50 text-blue-300 rounded">
+                            {(interfaceStats.type || 'ethernet').toUpperCase()}
+                          </span>
+                        </div>
+                        <div className={`w-3 h-3 rounded-full ${
+                          interfaceStats.active ? 'bg-green-400 animate-pulse' : 'bg-red-400'
+                        }`} />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-blue-400 text-lg font-bold">
+                            {(interfaceStats.packets || 0).toLocaleString()}
+                          </div>
+                          <div className="text-gray-400 text-xs">Packets</div>
+                        </div>
+                        <div>
+                          <div className="text-red-400 text-lg font-bold">{interfaceStats.threats || 0}</div>
+                          <div className="text-gray-400 text-xs">Threats</div>
+                        </div>
+                        <div>
+                          <div className="text-green-400 text-lg font-bold">
+                            {((interfaceStats.bytes || 0) / 1024 / 1024).toFixed(1)}MB
+                          </div>
+                          <div className="text-gray-400 text-xs">Data</div>
+                        </div>
+                        <div>
+                          <div className="text-orange-400 text-lg font-bold">
+                            {(interfaceStats.threat_rate || 0).toFixed(2)}%
+                          </div>
+                          <div className="text-gray-400 text-xs">Threat Rate</div>
+                        </div>
+                      </div>
 
-                {/* Protocol Distribution */}
-                {interfaceStats.protocol_distribution && Object.keys(interfaceStats.protocol_distribution).length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-700">
-                    <p className="text-xs text-gray-400 mb-2">Protocol Distribution:</p>
-                    <div className="flex space-x-2">
-                      {Object.entries(interfaceStats.protocol_distribution)
-                        .filter(([protocol, count]) => protocol && typeof count === 'number')
-                        .map(([protocol, count]) => (
-                        <span key={protocol} className="text-xs px-2 py-1 bg-gray-800 text-gray-300 rounded">
-                          {protocol}: {count}
-                        </span>
-                        ))}
+                      {/* Protocol Distribution */}
+                      {interfaceStats.protocol_distribution && 
+                       typeof interfaceStats.protocol_distribution === 'object' && 
+                       Object.keys(interfaceStats.protocol_distribution).length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-700">
+                          <p className="text-xs text-gray-400 mb-2">Protocol Distribution:</p>
+                          <div className="flex space-x-2">
+                            {Object.entries(interfaceStats.protocol_distribution)
+                              .filter(([protocol, count]) => protocol && typeof count === 'number' && count > 0)
+                              .map(([protocol, count]) => (
+                                <span key={protocol} className="text-xs px-2 py-1 bg-gray-800 text-gray-300 rounded">
+                                  {protocol}: {count}
+                                </span>
+                              ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  );
                 )}
-              </div>
-                ))}
+                .filter(component => component !== null)}
             </div>
           )}
         </div>
@@ -483,53 +526,44 @@ export function RealTimeInterfaceMonitor() {
         ) : (
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {recentThreats
-              .filter(threat => 
-                threat && 
-                threat.id && 
-                threat.timestamp && 
-                threat.source_ip &&
-                threat.destination_ip &&
-                typeof threat.severity === 'number' &&
-                typeof threat.confidence === 'number'
-              )
               .map((threat) => (
-              <div key={threat.id} className="bg-gray-900 rounded-lg p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center space-x-3">
-                    {getInterfaceIcon(threat.interface_type || 'ethernet')}
-                    <div>
-                      <div className="text-white text-sm font-medium">
-                        {threat.source_ip || 'Unknown'} → {threat.destination_ip || 'Unknown'}
+                <div key={threat.id || `threat-${Math.random()}`} className="bg-gray-900 rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center space-x-3">
+                      {getInterfaceIcon(threat.interface_type || 'ethernet')}
+                      <div>
+                        <div className="text-white text-sm font-medium">
+                          {threat.source_ip || 'Unknown'} → {threat.destination_ip || 'Unknown'}
+                        </div>
+                        <div className="text-gray-400 text-xs">
+                          {threat.interface || 'Unknown'} ({threat.interface_type || 'unknown'}) • {threat.protocol || 'Unknown'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-sm font-medium ${getSeverityColor(threat.severity || 1)}`}>
+                        Severity: {threat.severity || 1}
                       </div>
                       <div className="text-gray-400 text-xs">
-                        {threat.interface || 'Unknown'} ({threat.interface_type || 'unknown'}) • {threat.protocol || 'Unknown'}
+                        {threat.timestamp ? new Date(threat.timestamp).toLocaleTimeString() : 'Unknown time'}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className={`text-sm font-medium ${getSeverityColor(threat.severity || 1)}`}>
-                      Severity: {threat.severity || 1}
-                    </div>
-                    <div className="text-gray-400 text-xs">
-                      {threat.timestamp ? new Date(threat.timestamp).toLocaleTimeString() : 'Unknown time'}
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${getThreatTypeColor(threat.threat_type || 'unknown')}`}>
+                        {(threat.threat_type || 'unknown').replace('_', ' ').toUpperCase()}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        Confidence: {((threat.confidence || 0) * 100).toFixed(1)}%
+                      </span>
                     </div>
                   </div>
+                  
+                  <p className="text-gray-300 text-sm mt-2">{threat.description || 'No description available'}</p>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getThreatTypeColor(threat.threat_type || 'unknown')}`}>
-                      {(threat.threat_type || 'unknown').replace('_', ' ').toUpperCase()}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      Confidence: {((threat.confidence || 0) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-                
-                <p className="text-gray-300 text-sm mt-2">{threat.description || 'No description available'}</p>
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </div>

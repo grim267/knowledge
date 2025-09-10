@@ -11,6 +11,7 @@ import { UserManagement } from './UserManagement';
 import { MLModelTraining } from './MLModelTraining';
 import { EmailAlertConfiguration } from './EmailAlertConfiguration';
 import { RealTimeInterfaceMonitor } from './RealTimeInterfaceMonitor';
+import { RealTimeInterfaceMonitor } from './RealTimeInterfaceMonitor';
 import { useIncidentData } from '../hooks/useIncidentData';
 import { User } from '../types/user';
 
@@ -46,13 +47,13 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const safeAnomalies = anomalies || [];
   const safeNetworkTraffic = networkTraffic || [];
 
-  const localCriticalIncidents = safeIncidents.filter(i => i.severity === 'critical').length;
+  const localCriticalIncidents = safeIncidents.filter(i => i && i.severity === 'critical').length;
   const highIncidents = safeIncidents.filter(i => i.severity === 'high').length;
-  const activeLocalIncidents = safeIncidents.filter(i => i.status !== 'resolved').length;
+  const activeLocalIncidents = safeIncidents.filter(i => i && i.status && i.status !== 'resolved').length;
   const onlineSystemsCount = safeSystemStatus.filter(s => s.status === 'online').length;
-  const unacknowledgedAlerts = safeAlerts.filter(a => !a.acknowledged).length;
-  const highConfidenceThreats = safeThreatDetections.filter(t => t.confidence > 80).length;
-  const criticalAnomalies = safeAnomalies.filter(a => a.severity === 'critical').length;
+  const unacknowledgedAlerts = safeAlerts.filter(a => a && !a.acknowledged).length;
+  const highConfidenceThreats = safeThreatDetections.filter(t => t && typeof t.confidence === 'number' && t.confidence > 80).length;
+  const criticalAnomalies = safeAnomalies.filter(a => a && a.severity === 'critical').length;
 
   // Calculate total active threats from all sources
   const totalActiveThreats = activeLocalIncidents + highConfidenceThreats + localCriticalIncidents + (backendStats?.active_threats || 0);
@@ -140,8 +141,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   <div className="text-gray-400 text-sm">High Confidence</div>
                 </div>
                 <div className="bg-purple-900/30 rounded-lg p-4">
-                  <div className="text-purple-400 text-2xl font-bold">{criticalIncidentsCount}</div>
-                  <div className="text-gray-400 text-sm">Critical Backend</div>
+                  <div className="text-purple-400 text-2xl font-bold">{criticalAnomalies}</div>
+                  <div className="text-gray-400 text-sm">Critical Anomalies</div>
                 </div>
                 <div className="bg-blue-900/30 rounded-lg p-4">
                   <div className="text-blue-400 text-2xl font-bold">{backendStats?.active_threats || 0}</div>
@@ -173,7 +174,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               )}
             </div>
             <ThreatMap incidents={safeIncidents} />
-            <IncidentList incidents={safeIncidents.filter(i => i && i.status && i.status !== 'resolved')} />
+            <IncidentList incidents={safeIncidents.filter(i => i && i.id && i.status && i.status !== 'resolved')} />
           </div>
         );
       case 'network':
@@ -193,12 +194,18 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       case 'email-alerts':
         return <EmailAlertConfiguration />;
       case 'interface-monitor': {
-        // Import the component dynamically to avoid import errors
-        const RealTimeInterfaceMonitor = React.lazy(() => 
-          import('./RealTimeInterfaceMonitor').then(module => ({ default: module.RealTimeInterfaceMonitor }))
+        return (
+          <React.Suspense fallback={
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mr-3"></div>
+                <span className="text-gray-300">Loading Interface Monitor...</span>
+              </div>
+            </div>
+          }>
+            <RealTimeInterfaceMonitor />
+          </React.Suspense>
         );
-        
-        return <RealTimeInterfaceMonitor />;
       }
       default:
         return (
