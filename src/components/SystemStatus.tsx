@@ -3,10 +3,13 @@ import { Server, CheckCircle, AlertCircle, XCircle, Clock } from 'lucide-react';
 import { SystemStatus as SystemStatusType } from '../types/incident';
 
 interface SystemStatusProps {
-  systems: SystemStatusType[];
+  systemStatus: SystemStatusType[];
 }
 
-export function SystemStatus({ systems }: SystemStatusProps) {
+export function SystemStatus({ systemStatus }: SystemStatusProps) {
+  // Safety check for systemStatus array
+  const safeSystems = Array.isArray(systemStatus) ? systemStatus : [];
+  
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'online':
@@ -37,10 +40,6 @@ export function SystemStatus({ systems }: SystemStatusProps) {
     }
   };
 
-  const onlineCount = systems.filter(s => s.status === 'online').length;
-  
-  // Safety check for systems array
-  const safeSystems = Array.isArray(systems) ? systems : [];
   const safeOnlineCount = safeSystems.filter(s => s && s.status && s.status === 'online').length;
 
   return (
@@ -56,7 +55,13 @@ export function SystemStatus({ systems }: SystemStatusProps) {
       </div>
 
       <div className="space-y-3">
-        {safeSystems.filter(system => system && system.component && system.status && system.lastCheck).map((system, index) => (
+        {safeSystems.length === 0 ? (
+          <div className="text-center py-8">
+            <Server className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-400">No system status data available</p>
+          </div>
+        ) : (
+          safeSystems.filter(system => system && system.component && system.status && system.lastCheck).map((system, index) => (
           <div key={index} className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
             <div className="flex items-center space-x-3">
               {getStatusIcon(system.status)}
@@ -77,7 +82,8 @@ export function SystemStatus({ systems }: SystemStatusProps) {
               </div>
             </div>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
