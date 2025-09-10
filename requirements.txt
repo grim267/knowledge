@@ -8,3 +8,6 @@ flask
 flask-socketio
 flask-cors
 python-socketio
+
+# Email service dependencies
+secure-smtplib

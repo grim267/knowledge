@@ -246,20 +246,35 @@ Please respond immediately and update the incident status in the SOC dashboard.`
 
   async sendTestEmail(config: EmailConfig): Promise<boolean> {
     try {
-      const testData: SystemAlertData = {
-        alertType: 'test_alert',
-        message: 'This is a test email to verify your email configuration is working correctly.',
-        value: 50,
-        threshold: 80,
-        timestamp: new Date(),
-        systemInfo: {
-          cpuUsage: 45,
-          memoryUsage: 60,
-          diskUsage: { '/': 35, '/var': 20 }
-        }
-      };
-
-      return await this.sendSystemAlert(testData, config);
+      // Send test email via backend
+      const response = await fetch('http://localhost:8004/api/email/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config: {
+            smtpServer: config.smtpServer,
+            smtpPort: config.smtpPort,
+            smtpUsername: config.smtpUsername,
+            smtpPassword: config.smtpPassword,
+            useTls: config.useTls,
+            fromEmail: config.fromEmail,
+            toEmails: config.toEmails,
+            subjectPrefix: config.subjectPrefix
+          }
+        }),
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Test email sent successfully:', result.message);
+        return true;
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Test email failed:', errorData.error);
+        return false;
+      }
     } catch (error) {
       console.error('Test email failed:', error);
       return false;
@@ -324,27 +339,44 @@ Please respond immediately and update the incident status in the SOC dashboard.`
         return true;
       }
 
-      const template = this.templates.find(t => t.type === 'threat_alert');
-      if (!template) {
-        throw new Error('Threat alert template not found');
+      // Send threat alert via backend
+      const response = await fetch('http://localhost:8004/api/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config: {
+            smtpServer: emailConfig.smtpServer,
+            smtpPort: emailConfig.smtpPort,
+            smtpUsername: emailConfig.smtpUsername,
+            smtpPassword: emailConfig.smtpPassword,
+            useTls: emailConfig.useTls,
+            fromEmail: emailConfig.fromEmail,
+            toEmails: emailConfig.toEmails,
+            subjectPrefix: emailConfig.subjectPrefix
+          },
+          alertType: threatData.threatType,
+          title: `${threatData.threatType.toUpperCase()} Threat Detected`,
+          message: threatData.description,
+          severity: threatData.severity,
+          timestamp: threatData.timestamp.toISOString(),
+          sourceIp: threatData.sourceIp,
+          destinationIp: threatData.sourceIp, // Using sourceIp as destination for now
+          threatIndicators: threatData.indicators,
+          affectedSystems: threatData.affectedSystems,
+          category: 'threat'
+        }),
+      });
+      
+      if (response.ok) {
+        console.log('✅ Threat alert sent successfully');
+        return true;
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Threat alert failed:', errorData.error);
+        return false;
       }
-
-      const variables = {
-        subjectPrefix: emailConfig.subjectPrefix,
-        threatType: threatData.threatType,
-        severity: threatData.severity,
-        sourceIp: threatData.sourceIp,
-        description: threatData.description,
-        timestamp: threatData.timestamp.toLocaleString(),
-        indicators: threatData.indicators,
-        affectedSystems: threatData.affectedSystems
-      };
-
-      const subject = this.renderTemplate(template.subject, variables);
-      const body = this.renderTemplate(template.body, variables);
-
-      const priority = threatData.severity === 'critical' ? 'high' : 'normal';
-      return await this.sendEmail(emailConfig, subject, body, priority);
     } catch (error) {
       console.error('Failed to send threat alert:', error);
       return false;
@@ -353,52 +385,44 @@ Please respond immediately and update the incident status in the SOC dashboard.`
 
   private async sendEmail(config: EmailConfig, subject: string, body: string, priority: 'normal' | 'high' = 'normal'): Promise<boolean> {
     try {
-      // In a browser environment, we can't directly send emails via SMTP
-      // Instead, we'll use a backend API endpoint or email service
-      
-      // For now, we'll simulate the email sending and log the details
-      console.log('📧 Email Alert Sent:');
-      console.log('From:', config.fromEmail);
-      console.log('To:', config.toEmails.join(', '));
-      console.log('Subject:', subject);
-      console.log('Priority:', priority);
-      console.log('Body:', body);
-      
-      // In a real implementation, you would:
-      // 1. Send to a backend API that handles SMTP
-      // 2. Use a service like EmailJS for client-side email
-      // 3. Use a cloud email service API
-      
-      // Simulate API call to backend email service
-      try {
-        const response = await fetch('/api/send-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+      // Send email via backend email service
+      const response = await fetch('http://localhost:8004/api/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config: {
+            smtpServer: config.smtpServer,
+            smtpPort: config.smtpPort,
+            smtpUsername: config.smtpUsername,
+            smtpPassword: config.smtpPassword,
+            useTls: config.useTls,
+            fromEmail: config.fromEmail,
+            toEmails: config.toEmails,
+            subjectPrefix: config.subjectPrefix
           },
-          body: JSON.stringify({
-            config,
-            subject,
-            body,
-            priority
-          }),
-        });
-        
-        if (response.ok) {
-          console.log('✅ Email sent successfully via backend');
-          return true;
-        } else {
-          console.log('⚠️ Backend email service not available, email logged locally');
-          return true; // Return true for demo purposes
-        }
-      } catch (fetchError) {
-        console.log('⚠️ Backend not available, email logged locally');
-        return true; // Return true for demo purposes
+          title: subject.replace(config.subjectPrefix, '').trim(),
+          message: body,
+          severity: priority === 'high' ? 'high' : 'medium',
+          timestamp: new Date().toISOString(),
+          category: 'system'
+        }),
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Email sent successfully via backend:', result.message);
+        return true;
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Email sending failed:', errorData.error);
+        throw new Error(errorData.error || 'Email sending failed');
       }
       
     } catch (error) {
       console.error('Email sending failed:', error);
-      return false;
+      throw error;
     }
   }
 

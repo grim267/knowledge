@@ -46,6 +46,11 @@ def main():
             'script': 'threat_detection_backend.py',
             'port': 5000,
             'name': 'Threat Detection Backend'
+        },
+        {
+            'script': 'email_service_backend.py',
+            'port': 8004,
+            'name': 'Email Service Backend'
         }
     ]
     

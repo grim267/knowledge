@@ -585,12 +585,15 @@ export function EmailAlertConfiguration() {
           
           <div className="bg-gray-900 rounded-lg p-4">
             <h4 className="font-medium text-white mb-2">Custom SMTP Server</h4>
-            <ol className="list-decimal list-inside space-y-1">
-              <li>Contact your IT administrator for SMTP server details</li>
-              <li>Ensure the server allows authentication and relay</li>
-              <li>Configure appropriate port (25, 465, 587, or 2525)</li>
-              <li>Enable TLS if supported by your server</li>
-            </ol>
+            <div className="space-y-2">
+              <p>Start the email backend service:</p>
+              <code className="block bg-gray-800 text-green-400 p-2 rounded text-sm">
+                python email_service_backend.py
+              </code>
+              <p className="text-xs text-gray-400">
+                This starts the email service on port 8004 for actual SMTP email sending
+              </p>
+            </div>
           </div>
         </div>
       </div>
