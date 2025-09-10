@@ -105,14 +105,22 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     switch (activeSection) {
       case 'threats':
         return 'Active Threats';
+      case 'critical':
+        return 'Critical Incidents';
       case 'network':
         return 'Network Traffic Monitor';
       case 'systems':
         return 'Systems Status';
+      case 'alerts':
+        return 'Active Alerts';
+      case 'incidents':
+        return 'Recent Incidents';
       case 'detection':
         return 'Threat Detection & Anomalies';
       case 'user-management':
         return 'User Management';
+      case 'critical-incidents':
+        return 'Critical Incidents';
       default:
         return 'Dashboard Overview';
     }
@@ -187,78 +195,30 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   <div className="text-gray-400 text-sm">High Priority</div>
                 </div>
                 <div className="bg-yellow-900/30 rounded-lg p-4">
-                  <div className="text-yellow-400 text-2xl font-bold">{activeLocalIncidents}</div>
-                  <div className="text-gray-400 text-sm">Total Active</div>
+                  <div className="text-yellow-400 text-2xl font-bold">{unacknowledgedAlerts}</div>
+                  <div className="text-gray-400 text-sm">Unacknowledged</div>
                 </div>
               </div>
             </div>
-            <IncidentList incidents={safeIncidents.filter(i => i && i.severity && (i.severity === 'critical' || i.severity === 'high'))} />
+            <CriticalIncidentsPanel criticalIncidents={safeCriticalIncidents} />
           </div>
         );
       case 'network':
-        return (
-          <div className="space-y-6">
-            <NetworkMonitor networkTraffic={safeNetworkTraffic} />
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Network Analysis</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="text-blue-400 text-xl font-bold">
-                    {safeNetworkTraffic.filter(t => t && t.suspicious).length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Suspicious Connections</div>
-                </div>
-                <div className="bg-gray-900 rounded-lg p-4">
-                  <div className="text-green-400 text-xl font-bold">
-                    {safeAlerts.filter(a => a && a.isDuplicate).length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Total Data Volume</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+        return <NetworkMonitor networkTraffic={safeNetworkTraffic} />;
       case 'systems':
-        return (
-          <div className="space-y-6">
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">System Health Overview</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-green-900/30 rounded-lg p-4">
-                  <div className="text-green-400 text-xl font-bold">
-                    {safeSystemStatus.filter(s => s && s.status === 'online').length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Online</div>
-                </div>
-                <div className="bg-yellow-900/30 rounded-lg p-4">
-                  <div className="text-yellow-400 text-xl font-bold">
-                    {safeSystemStatus.filter(s => s && s.status === 'warning').length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Warning</div>
-                </div>
-                <div className="bg-red-900/30 rounded-lg p-4">
-                  <div className="text-red-400 text-xl font-bold">
-                    {safeSystemStatus.filter(s => s && s.status === 'error').length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Error</div>
-                </div>
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <div className="text-gray-400 text-xl font-bold">
-                    {safeSystemStatus.filter(s => s && s.status === 'offline').length}
-                  </div>
-                  <div className="text-gray-400 text-sm">Offline</div>
-                </div>
-              </div>
-            </div>
-            <SystemStatus systems={safeSystemStatus} />
-          </div>
-        );
+        return <SystemStatus systemStatus={safeSystemStatus} />;
+      case 'alerts':
+        return <AlertPanel alerts={safeAlerts} />;
+      case 'incidents':
+        return <IncidentList incidents={safeIncidents} />;
+      case 'user-management':
+        return <UserManagement />;
+      case 'critical-incidents':
+        return <CriticalIncidentsPanel criticalIncidents={safeCriticalIncidents} />;
       case 'detection':
         return <ThreatDetectionPanel threatDetections={safeThreatDetections} anomalies={safeAnomalies} />;
       case 'email-alerts':
         return <SystemAlertPanel />;
-      case 'user-management':
-        return user ? <UserManagement currentUser={user} /> : null;
       case 'ml-training':
         return <MLModelTraining />;
       default:
