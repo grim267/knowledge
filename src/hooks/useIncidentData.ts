@@ -201,6 +201,46 @@ export function useIncidentData() {
       setThreatBackendConnected(connected)
     })
 
+    // Set up interface monitor integration
+    const interfaceMonitorInterval = setInterval(async () => {
+      try {
+        // Fetch threats from interface monitor API
+        const response = await fetch('http://localhost:8005/api/threats/recent?limit=20');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.threats && Array.isArray(data.threats)) {
+            // Convert interface threats to incidents for dashboard display
+            const interfaceIncidents = data.threats
+              .filter(threat => threat && threat.id && threat.source_ip)
+              .map(threat => ({
+                id: `IFACE-${threat.id}`,
+                timestamp: new Date(threat.timestamp),
+                type: (threat.threat_type || 'malware') as any,
+                severity: (threat.severity >= 8 ? 'critical' : 
+                          threat.severity >= 6 ? 'high' : 
+                          threat.severity >= 4 ? 'medium' : 'low') as any,
+                source: threat.source_ip,
+                target: threat.destination_ip,
+                description: `${threat.description} (Interface: ${threat.interface})`,
+                status: 'detected' as const,
+                responseActions: threat.severity >= 8 ? ['Block IP address', 'Isolate interface'] : ['Monitor traffic'],
+                affectedSystems: [threat.interface]
+              }));
+            
+            // Add interface incidents to the main incidents list
+            setIncidents(prev => {
+              const existingIds = new Set(prev.map(i => i.id));
+              const newIncidents = interfaceIncidents.filter(i => !existingIds.has(i.id));
+              return [...newIncidents, ...prev.slice(0, 40)]; // Keep last 40 + new ones
+            });
+          }
+        }
+      } catch (error) {
+        // Silently handle interface monitor API errors
+        console.debug('Interface monitor API not available:', error);
+      }
+    }, 10000); // Check every 10 seconds
+
     // Supabase setup (keep existing functionality)
     fetchAlerts()
     fetchAlertsFromBackend()
@@ -224,6 +264,7 @@ export function useIncidentData() {
       unsubscribeStats()
       unsubscribeConnection()
       unsubscribeThreatBackend()
+      clearInterval(interfaceMonitorInterval)
       
       try {
         supabase.removeChannel(incidentsChannel)

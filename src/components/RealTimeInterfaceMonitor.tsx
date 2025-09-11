@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, Feather as Ethernet, Activity, Shield, Brain, AlertTriangle, Play, Square, RefreshCw } from 'lucide-react';
+import { Wifi, Feather as Ethernet, Activity, Shield, Brain, AlertTriangle, Play, Square, RefreshCw, Mail, Ban } from 'lucide-react';
+import { emailService } from '../services/emailService';
 
 interface InterfaceStats {
   name: string;
@@ -48,6 +49,8 @@ export function RealTimeInterfaceMonitor() {
   const [isConnected, setIsConnected] = useState(false);
   const [monitoringLog, setMonitoringLog] = useState<string[]>([]);
   const [availableInterfaces, setAvailableInterfaces] = useState<Array<{name: string, type: string, is_up: boolean}>>([]);
+  const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(true);
+  const [blockedIPs, setBlockedIPs] = useState<Set<string>>(new Set());
 
   const monitorApiUrl = 'http://localhost:8005'; // Real-time monitor API
 
@@ -67,6 +70,42 @@ export function RealTimeInterfaceMonitor() {
       clearInterval(statsInterval);
     };
   }, [isConnected]);
+
+  // Process new threats for email alerts
+  useEffect(() => {
+    if (recentThreats.length > 0 && emailAlertsEnabled) {
+      const latestThreat = recentThreats[0];
+      if (latestThreat && latestThreat.severity >= 6) { // Send emails for medium+ severity
+        sendThreatEmailAlert(latestThreat);
+      }
+    }
+  }, [recentThreats, emailAlertsEnabled]);
+
+  const sendThreatEmailAlert = async (threat: RealtimeThreat) => {
+    try {
+      const success = await emailService.sendThreatAlert({
+        threatType: threat.threat_type,
+        severity: threat.severity >= 8 ? 'critical' : threat.severity >= 6 ? 'high' : 'medium',
+        sourceIp: threat.source_ip,
+        description: `${threat.description} detected on ${threat.interface} (${threat.interface_type})`,
+        timestamp: new Date(threat.timestamp),
+        indicators: [
+          `Interface: ${threat.interface}`,
+          `Protocol: ${threat.protocol}`,
+          `Confidence: ${(threat.confidence * 100).toFixed(1)}%`
+        ],
+        affectedSystems: [threat.interface, threat.destination_ip]
+      });
+      
+      if (success) {
+        addToLog(`📧 Email alert sent for ${threat.threat_type} from ${threat.source_ip}`);
+      } else {
+        addToLog(`❌ Failed to send email alert for threat ${threat.id}`);
+      }
+    } catch (error) {
+      addToLog(`❌ Email alert error: ${error}`);
+    }
+  };
 
   const checkMonitorConnection = async () => {
     try {
@@ -271,6 +310,44 @@ export function RealTimeInterfaceMonitor() {
     }
   };
 
+  const blockIP = async (ip: string) => {
+    try {
+      const response = await fetch(`${monitorApiUrl}/api/block/${ip}`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        setBlockedIPs(prev => new Set([...prev, ip]));
+        addToLog(`🚫 Blocked IP: ${ip}`);
+      } else {
+        addToLog(`❌ Failed to block IP: ${ip}`);
+      }
+    } catch (error) {
+      addToLog(`❌ Error blocking IP ${ip}: ${error}`);
+    }
+  };
+
+  const unblockIP = async (ip: string) => {
+    try {
+      const response = await fetch(`${monitorApiUrl}/api/unblock/${ip}`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        setBlockedIPs(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(ip);
+          return newSet;
+        });
+        addToLog(`✅ Unblocked IP: ${ip}`);
+      } else {
+        addToLog(`❌ Failed to unblock IP: ${ip}`);
+      }
+    } catch (error) {
+      addToLog(`❌ Error unblocking IP ${ip}: ${error}`);
+    }
+  };
+
   const addToLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setMonitoringLog(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 49)]);
@@ -313,11 +390,26 @@ export function RealTimeInterfaceMonitor() {
                 Monitor {isConnected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${emailAlertsEnabled ? 'bg-blue-400' : 'bg-gray-400'}`} />
+              <span className="text-sm text-gray-300">
+                Email Alerts {emailAlertsEnabled ? 'On' : 'Off'}
+              </span>
+            </div>
             <button
               onClick={checkMonitorConnection}
               className="p-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
             >
               <RefreshCw className="h-4 w-4 text-white" />
+            </button>
+            <button
+              onClick={() => setEmailAlertsEnabled(!emailAlertsEnabled)}
+              className={`p-2 rounded-lg transition-colors ${
+                emailAlertsEnabled ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-600 hover:bg-gray-700'
+              }`}
+              title="Toggle email alerts"
+            >
+              <Mail className="h-4 w-4 text-white" />
             </button>
             <button
               onClick={isMonitoring ? stopMonitoring : startMonitoring}
@@ -502,7 +594,12 @@ export function RealTimeInterfaceMonitor() {
       <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
           <Shield className="h-5 w-5 text-red-400 mr-2" />
-          Recent Interface Threats
+          Live Interface Threats
+          {recentThreats.length > 0 && (
+            <span className="ml-2 text-xs px-2 py-1 bg-red-600 text-white rounded-full">
+              {recentThreats.length}
+            </span>
+          )}
         </h3>
         
         {!recentThreats || recentThreats.length === 0 ? (
@@ -526,43 +623,83 @@ export function RealTimeInterfaceMonitor() {
                 typeof threat.confidence === 'number'
               )
               .map((threat) => (
-              <div key={threat.id} className="bg-gray-900 rounded-lg p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center space-x-3">
-                    {getInterfaceIcon(threat.interface_type || 'ethernet')}
-                    <div>
-                      <div className="text-white text-sm font-medium">
-                        {threat.source_ip || 'Unknown'} → {threat.destination_ip || 'Unknown'}
+                <div key={threat.id} className={`bg-gray-900 rounded-lg p-4 border-l-4 ${
+                  threat.severity >= 8 ? 'border-red-500' : 
+                  threat.severity >= 6 ? 'border-orange-500' : 
+                  threat.severity >= 4 ? 'border-yellow-500' : 'border-blue-500'
+                }`}>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      {getInterfaceIcon(threat.interface_type || 'ethernet')}
+                      <div>
+                        <div className="text-white text-sm font-medium">
+                          {threat.source_ip || 'Unknown'} → {threat.destination_ip || 'Unknown'}
+                        </div>
+                        <div className="text-gray-400 text-xs">
+                          {threat.interface || 'Unknown'} ({threat.interface_type || 'unknown'}) • {threat.protocol || 'Unknown'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-sm font-medium ${getSeverityColor(threat.severity || 1)}`}>
+                        Severity: {threat.severity || 1}/10
                       </div>
                       <div className="text-gray-400 text-xs">
-                        {threat.interface || 'Unknown'} ({threat.interface_type || 'unknown'}) • {threat.protocol || 'Unknown'}
+                        {threat.timestamp ? new Date(threat.timestamp).toLocaleTimeString() : 'Unknown time'}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className={`text-sm font-medium ${getSeverityColor(threat.severity || 1)}`}>
-                      Severity: {threat.severity || 1}
+                  
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${getThreatTypeColor(threat.threat_type || 'unknown')}`}>
+                        {(threat.threat_type || 'unknown').replace('_', ' ').toUpperCase()}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        Confidence: {((threat.confidence || 0) * 100).toFixed(1)}%
+                      </span>
+                      {blockedIPs.has(threat.source_ip) && (
+                        <span className="text-xs px-2 py-1 bg-red-600 text-white rounded">
+                          BLOCKED
+                        </span>
+                      )}
                     </div>
-                    <div className="text-gray-400 text-xs">
-                      {threat.timestamp ? new Date(threat.timestamp).toLocaleTimeString() : 'Unknown time'}
+                  </div>
+                  
+                  <p className="text-gray-300 text-sm mb-3">{threat.description || 'No description available'}</p>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-700">
+                    <div className="flex space-x-2">
+                      {!blockedIPs.has(threat.source_ip) ? (
+                        <button
+                          onClick={() => blockIP(threat.source_ip)}
+                          className="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors flex items-center space-x-1"
+                        >
+                          <Ban className="h-3 w-3" />
+                          <span>Block IP</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => unblockIP(threat.source_ip)}
+                          className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                        >
+                          Unblock IP
+                        </button>
+                      )}
+                      {emailAlertsEnabled && threat.severity >= 6 && (
+                        <span className="text-xs px-2 py-1 bg-blue-900/50 text-blue-300 rounded flex items-center space-x-1">
+                          <Mail className="h-3 w-3" />
+                          <span>Email Sent</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      ID: {threat.id.substring(0, 8)}...
                     </div>
                   </div>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getThreatTypeColor(threat.threat_type || 'unknown')}`}>
-                      {(threat.threat_type || 'unknown').replace('_', ' ').toUpperCase()}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      Confidence: {((threat.confidence || 0) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-                
-                <p className="text-gray-300 text-sm mt-2">{threat.description || 'No description available'}</p>
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </div>
@@ -595,6 +732,18 @@ export function RealTimeInterfaceMonitor() {
       {/* Setup Instructions */}
       <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
         <h3 className="text-lg font-semibold text-white mb-4">Setup Instructions</h3>
+        
+        {/* Email Configuration Status */}
+        <div className="mb-6 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+          <h4 className="text-blue-300 font-medium mb-2">Email Alert Integration</h4>
+          <div className="text-sm text-gray-300 space-y-1">
+            <p>• Configure email settings in the "Email Alerts" section</p>
+            <p>• Email alerts are automatically sent for threats with severity ≥ 6</p>
+            <p>• Toggle email alerts using the mail icon in the header</p>
+            <p>• Blocked IPs are tracked and displayed with threat information</p>
+          </div>
+        </div>
+        
         <div className="space-y-4">
           <div className="bg-gray-900 rounded-lg p-4">
             <h4 className="text-white font-medium mb-2">1. Install Dependencies</h4>
@@ -618,7 +767,13 @@ export function RealTimeInterfaceMonitor() {
           </div>
           
           <div className="bg-gray-900 rounded-lg p-4">
-            <h4 className="text-white font-medium mb-2">4. ML Model Features</h4>
+            <h4 className="text-white font-medium mb-2">4. Start Email Service</h4>
+            <code className="text-green-400 text-sm bg-gray-800 px-1 rounded">python email_service_backend.py</code>
+            <p className="text-gray-400 text-xs mt-1">Enables email alerts for detected threats</p>
+          </div>
+          
+          <div className="bg-gray-900 rounded-lg p-4">
+            <h4 className="text-white font-medium mb-2">5. ML Model Features</h4>
             <ul className="list-disc list-inside text-gray-400 text-xs">
               <li>Persistent learning - model remembers what it learns</li>
               <li>Real-time threat classification</li>
@@ -626,6 +781,7 @@ export function RealTimeInterfaceMonitor() {
               <li>25+ advanced features for threat detection</li>
               <li>Wi-Fi and Ethernet interface monitoring</li>
               <li>Behavioral anomaly detection</li>
+              <li>Automatic email alerts for high-severity threats</li>
             </ul>
           </div>
         </div>

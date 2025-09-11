@@ -468,6 +468,7 @@ Please respond immediately and update the incident status in the SOC dashboard.`
     try {
       const config = await this.getEmailConfiguration();
       if (!config || !config.isActive) {
+        console.log('Email alerts disabled or no configuration found');
         return;
       }
 
@@ -505,6 +506,53 @@ Please respond immediately and update the incident status in the SOC dashboard.`
       }
     } catch (error) {
       console.error('Failed to process alert for email:', error);
+    }
+  }
+
+  // Method specifically for interface monitor threats
+  async processInterfaceThreat(threat: {
+    id: string;
+    source_ip: string;
+    destination_ip: string;
+    interface: string;
+    interface_type: string;
+    threat_type: string;
+    severity: number;
+    confidence: number;
+    description: string;
+    protocol: string;
+    timestamp: string;
+    indicators?: string[];
+  }): Promise<void> {
+    try {
+      const config = await this.getEmailConfiguration();
+      if (!config || !config.isActive || !config.thresholds.sendThreatEmails) {
+        return;
+      }
+
+      // Only send emails for significant threats
+      if (threat.severity < 6) {
+        return;
+      }
+
+      const threatData: ThreatAlertData = {
+        threatType: threat.threat_type,
+        severity: threat.severity >= 8 ? 'critical' : threat.severity >= 6 ? 'high' : 'medium',
+        sourceIp: threat.source_ip,
+        description: `${threat.description} detected on ${threat.interface} (${threat.interface_type})`,
+        timestamp: new Date(threat.timestamp),
+        indicators: [
+          `Interface: ${threat.interface}`,
+          `Protocol: ${threat.protocol}`,
+          `Confidence: ${(threat.confidence * 100).toFixed(1)}%`,
+          ...(threat.indicators || [])
+        ],
+        affectedSystems: [threat.interface, threat.destination_ip]
+      };
+
+      await this.sendThreatAlert(threatData, config);
+    } catch (error) {
+      console.error('Failed to process interface threat for email:', error);
     }
   }
 

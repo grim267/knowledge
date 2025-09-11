@@ -19,6 +19,8 @@ import signal
 import psutil
 import socket
 import struct
+import asyncio
+import aiohttp
 
 # Import our ML model
 from ml_models.threat_detection_model import threat_model
@@ -49,6 +51,7 @@ class InterfaceMonitor:
         
         # Threat detection
         self.threat_buffer = deque(maxlen=1000)
+        self.recent_threats = deque(maxlen=100)  # For API access
         self.connection_tracker = defaultdict(lambda: {
             'packets': 0,
             'bytes': 0,
@@ -241,6 +244,7 @@ class InterfaceMonitor:
             
             # Store threat
             self.threat_buffer.append(threat_alert)
+            self.recent_threats.append(threat_alert)
             
             # Send to Supabase for dashboard display
             self.send_threat_to_dashboard(threat_alert)
@@ -249,6 +253,12 @@ class InterfaceMonitor:
             if severity >= 8:
                 self.stats['blocked_ips'].add(packet_info['source_ip'])
                 self.logger.critical(f"🚫 AUTO-BLOCKED: {packet_info['source_ip']} - Severity {severity}")
+                
+                # Send high-priority email alert
+                asyncio.create_task(self.send_email_alert(threat_alert, 'critical'))
+            elif severity >= 6:
+                # Send medium-priority email alert
+                asyncio.create_task(self.send_email_alert(threat_alert, 'high'))
             
             # Log threat detection
             self.logger.warning(
@@ -258,6 +268,61 @@ class InterfaceMonitor:
             
         except Exception as e:
             self.logger.error(f"Error processing threat: {e}")
+    
+    async def send_email_alert(self, threat_alert: Dict, priority: str):
+        """Send email alert for detected threat"""
+        try:
+            # Send to email service backend
+            email_data = {
+                'config': {
+                    'smtpServer': 'smtp.gmail.com',  # Default - should be configured
+                    'smtpPort': 587,
+                    'smtpUsername': '',  # Will be filled from configuration
+                    'smtpPassword': '',  # Will be filled from configuration
+                    'useTls': True,
+                    'fromEmail': 'security@company.com',
+                    'toEmails': ['admin@company.com'],  # Default recipients
+                    'subjectPrefix': '[INTERFACE THREAT]'
+                },
+                'alertType': threat_alert['threat_type'],
+                'title': f"{threat_alert['threat_type'].replace('_', ' ').title()} Detected",
+                'message': f"""Real-time threat detected on {threat_alert['interface']} interface:
+
+Source IP: {threat_alert['source_ip']}
+Destination IP: {threat_alert['destination_ip']}
+Interface: {threat_alert['interface']} ({threat_alert['interface_type']})
+Threat Type: {threat_alert['threat_type']}
+Severity: {threat_alert['severity']}/10
+Confidence: {threat_alert['confidence']:.2f}
+Protocol: {threat_alert['protocol']}
+
+Description: {threat_alert['description']}
+
+ML Classification: {json.dumps(threat_alert['ml_classification'], indent=2)}
+
+Immediate investigation recommended.""",
+                'severity': priority,
+                'timestamp': threat_alert['timestamp'],
+                'sourceIp': threat_alert['source_ip'],
+                'destinationIp': threat_alert['destination_ip'],
+                'threatIndicators': threat_alert['indicators'],
+                'affectedSystems': [threat_alert['interface']],
+                'category': 'threat'
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    'http://localhost:8004/api/email/send',
+                    json=email_data,
+                    timeout=10
+                ) as response:
+                    if response.status == 200:
+                        self.logger.info(f"📧 Email alert sent for threat {threat_alert['id']}")
+                    else:
+                        self.logger.warning(f"❌ Email alert failed: {response.status}")
+                        
+        except Exception as e:
+            self.logger.error(f"Error sending email alert: {e}")
     
     def send_threat_to_dashboard(self, threat_alert: Dict):
         """Send threat alert to dashboard via Supabase"""
@@ -338,6 +403,10 @@ class InterfaceMonitor:
         """Stop monitoring this interface"""
         self.is_active = False
         self.logger.info(f"🛑 Stopped monitoring {self.interface_name}")
+
+    def get_recent_threats(self, limit: int = 50) -> List[Dict]:
+        """Get recent threats for API access"""
+        return list(self.recent_threats)[-limit:]
 
 class RealTimeNetworkMonitor:
     """Real-time network monitor for multiple interfaces"""

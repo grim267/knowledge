@@ -107,7 +107,137 @@ def get_recent_threats():
         
         # Collect threats from all interface monitors
         for monitor in network_monitor.interface_monitors.values():
-            for threat in list(monitor.threat_buffer)[-limit:]:
+            # Use the new get_recent_threats method
+            recent_threats = monitor.get_recent_threats(limit)
+            for threat in recent_threats:
+                # Ensure threat has all required fields
+                if (threat and 
+                    threat.get('id') and 
+                    threat.get('timestamp') and 
+                    threat.get('source_ip') and 
+                    threat.get('destination_ip')):
+                    all_threats.append(threat)
+        
+        # Sort by timestamp (most recent first) and ensure proper format
+        valid_threats = []
+        for threat in all_threats:
+            try:
+                # Ensure timestamp is properly formatted
+                if isinstance(threat.get('timestamp'), str):
+                    threat['timestamp'] = threat['timestamp']
+                else:
+                    threat['timestamp'] = threat['timestamp'].isoformat() if threat.get('timestamp') else datetime.now().isoformat()
+                
+                # Validate required fields
+                if all(key in threat for key in ['id', 'source_ip', 'destination_ip', 'severity', 'confidence']):
+                    valid_threats.append(threat)
+            except Exception as e:
+                logger.error(f"Error processing threat for API: {e}")
+                continue
+        
+        # Sort by timestamp
+        try:
+            valid_threats.sort(key=lambda x: x['timestamp'], reverse=True)
+        except Exception as e:
+            logger.warning(f"Error sorting threats: {e}")
+        
+        return jsonify({
+            'threats': valid_threats[:limit],
+            'total': len(valid_threats)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting recent threats: {e}")
+        return jsonify({'threats': [], 'error': str(e)})
+
+@app.route('/api/threats/stats', methods=['GET'])
+def get_threat_stats():
+    """Get threat statistics by interface"""
+    if not network_monitor:
+        return jsonify({'stats': {}})
+    
+    try:
+        interface_stats = {}
+        
+        for interface_name, monitor in network_monitor.interface_monitors.items():
+            # Count threats by type and severity
+            threat_types = {}
+            severity_counts = {}
+            
+            for threat in monitor.recent_threats:
+                threat_type = threat.get('threat_type', 'unknown')
+                severity = threat.get('severity', 1)
+                
+                threat_types[threat_type] = threat_types.get(threat_type, 0) + 1
+                severity_range = f"{(severity // 2) * 2}-{(severity // 2) * 2 + 1}"
+                severity_counts[severity_range] = severity_counts.get(severity_range, 0) + 1
+            
+            interface_stats[interface_name] = {
+                'threat_types': threat_types,
+                'severity_distribution': severity_counts,
+                'total_threats': len(monitor.recent_threats),
+                'blocked_ips': len(monitor.stats['blocked_ips'])
+            }
+        
+        return jsonify({'stats': interface_stats})
+        
+    except Exception as e:
+        logger.error(f"Error getting threat stats: {e}")
+        return jsonify({'stats': {}, 'error': str(e)})
+
+@app.route('/api/email/test-threat', methods=['POST'])
+def test_threat_email():
+    """Send a test threat email"""
+    try:
+        # Create a test threat
+        test_threat = {
+            'id': str(uuid.uuid4()),
+            'timestamp': datetime.now().isoformat(),
+            'source_ip': '192.168.1.100',
+            'destination_ip': '10.0.0.5',
+            'interface': 'eth0',
+            'interface_type': 'ethernet',
+            'threat_type': 'test_threat',
+            'severity': 7,
+            'confidence': 0.85,
+            'description': 'This is a test threat alert to verify email integration',
+            'protocol': 'TCP',
+            'indicators': ['Test indicator 1', 'Test indicator 2']
+        }
+        
+        # Send email via the email service
+        email_data = {
+            'config': request.json.get('config', {}),
+            'alertType': 'test_threat',
+            'title': 'Test Threat Alert from Interface Monitor',
+            'message': f"""Test threat detected on interface monitoring system:
+
+Source IP: {test_threat['source_ip']}
+Destination IP: {test_threat['destination_ip']}
+Interface: {test_threat['interface']} ({test_threat['interface_type']})
+Threat Type: {test_threat['threat_type']}
+Severity: {test_threat['severity']}/10
+Confidence: {test_threat['confidence']:.2f}
+
+This is a test alert to verify the email integration is working correctly.""",
+            'severity': 'high',
+            'timestamp': test_threat['timestamp'],
+            'sourceIp': test_threat['source_ip'],
+            'destinationIp': test_threat['destination_ip'],
+            'category': 'threat'
+        }
+        
+        import requests
+        response = requests.post('http://localhost:8004/api/email/send', json=email_data, timeout=10)
+        
+        if response.status_code == 200:
+            return jsonify({'status': 'success', 'message': 'Test threat email sent successfully'})
+        else:
+            return jsonify({'error': 'Failed to send test email'}), 500
+            
+    except Exception as e:
+        logger.error(f"Test threat email error: {e}")
+        return jsonify({'error': str(e)}), 500
                 all_threats.append(threat)
         
         # Sort by timestamp (most recent first)

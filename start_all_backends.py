@@ -117,6 +117,12 @@ def main():
             'description': 'Interface monitoring API'
         },
         {
+            'script': 'real_time_interface_monitor.py',
+            'port': None,
+            'name': 'Real-Time Interface Monitor',
+            'description': 'Live packet capture and threat detection'
+        },
+        {
             'script': 'ml_models/model_api.py',
             'port': 8003,
             'name': 'ML Model API',
